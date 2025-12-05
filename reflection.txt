@@ -1,0 +1,21 @@
+Reflection on our team's progress
+
+  Our team made steady progress throughout Deliverable 3. We built on the work from Deliverables 1 and 2 to expand the requirements and develop a clear system design. 
+The group met most deadlines and divided the sections pretty fairly, which helped us stay organized. Communication improved as we moved forward, and everyone contributed 
+to writing and editing the document.The design diagrams, glossary, and new functional requirements were completed on time and matched the feedback from our professor.
+
+  One thing that went well was how we used the earlier deliverables to guide our writing. The structure was consistent, and we made sure every section connected to the 
+previous phase. Another thing that also went well is that our group ideas were on the same page. We understood the goals for the system and agreed on how to present them 
+in the document. This made collaboration easier and helped us stay consistent in our work. We also presented the updated UI and received helpful feedback that clarified 
+what the customer expected.
+
+  There were a few challenges. One issue was waiting for responses from the customers when we needed certain feedback. Earlier in the semester, our email was sent from 
+the wrong address to the customers, so they didn’t receive it, which delayed getting the responses we needed from them. It was also not easy to find times in everyone’s
+schedule to meet up since we all have different class schedules.
+
+  From the feedback we received, we learned that it is important to keep every section detailed but simple to follow. We also learned that following up early with customers
+and being clear in communication with the customers would help us avoid future delays.
+
+  From our experiences, the next steps are improving our communications, managing time more carefully, and continuing refining the design the best we can before moving into
+the implementation phase. We plan to have meetings more often so we can be more organized and have the right direction for more progress. But overall, the project was on track,
+and the group has a clear direction for the next phase.
