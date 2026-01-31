@@ -28,15 +28,19 @@ export default function Login() {
       navigate("/dashboard");
     } catch (err) {
       console.error(err);
+
       if (err.response && err.response.data) {
         const data = err.response.data;
         const newFieldErrors = {};
+
         Object.entries(data).forEach(([key, value]) => {
           if (Array.isArray(value)) newFieldErrors[key] = value.join(" ");
           else if (typeof value === "string") newFieldErrors[key] = value;
         });
+
         setFieldErrors(newFieldErrors);
 
+        // lockout sometimes returns 423 with detail message
         if (data.detail || data.non_field_errors) {
           setError(data.detail || data.non_field_errors.join(" "));
         } else {
@@ -50,11 +54,12 @@ export default function Login() {
     }
   }
 
+  const isLocked =
+    typeof error === "string" &&
+    error.toLowerCase().includes("locked");
+
   return (
-    <div
-      className="auth-page"
-      style={{ backgroundImage: `url(${bgImage})` }}
-    >
+    <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
       <div className="auth-left">
         <h1 className="auth-title">
           Welcome to NCBW
@@ -101,20 +106,30 @@ export default function Login() {
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
+
+            <div style={{ marginTop: 10, textAlign: "right" }}>
+              <Link to="/forgot-password">Forgot password?</Link>
+            </div>
+
             {fieldErrors.password && (
               <div className="field-error">{fieldErrors.password}</div>
             )}
           </div>
 
-          <button
-            type="submit"
-            className="auth-button"
-            disabled={loading}
-          >
+          <button type="submit" className="auth-button" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </button>
 
-          {error && <div className="auth-error">{error}</div>}
+          {error && (
+            <div className="auth-error">
+              {error}
+              {isLocked && (
+                <div style={{ marginTop: 8 }}>
+                  <Link to="/forgot-password">Reset password</Link>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="auth-footer">
             Create an account <Link to="/signup">here.</Link>

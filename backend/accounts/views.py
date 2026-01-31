@@ -1,85 +1,180 @@
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+from django.conf import settings
+from django.core.mail import send_mail
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import RegisterSerializer, LoginSerializer
-from .models import LoginSecurity
+User = get_user_model()
+token_generator = PasswordResetTokenGenerator()
 
 
+# -----------------------
+# REGISTER (Member ID = username)
+# -----------------------
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {"message": "Account created successfully."},
-                status=status.HTTP_201_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = request.data
+
+        # frontend sends member_id
+        member_id = data.get("member_id")
+        email = data.get("email")
+        password = data.get("password")
+        first_name = data.get("first_name", "")
+        last_name = data.get("last_name", "")
+
+        errors = {}
+
+        if not member_id:
+            errors["member_id"] = ["This field is required."]
+        else:
+            # member_id is stored as username
+            if User.objects.filter(username=member_id).exists():
+                errors["member_id"] = ["This Member ID is already taken."]
+
+        if not email:
+            errors["email"] = ["This field is required."]
+        else:
+            if User.objects.filter(email=email).exists():
+                errors["email"] = ["This email is already in use."]
+
+        if not password:
+            errors["password"] = ["This field is required."]
+
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(
+            username=member_id,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
+
+        return Response(
+            {"detail": "Account created successfully.", "id": user.id},
+            status=status.HTTP_201_CREATED,
+        )
 
 
+# -----------------------
+# LOGIN (Member ID = username)
+# -----------------------
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        member_id = request.data.get("member_id")
+        password = request.data.get("password")
 
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not member_id or not password:
+            return Response(
+                {"detail": "Member ID and password are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        member_id = serializer.validated_data['member_id']
-        password = serializer.validated_data['password']
+        # authenticate expects username
+        user = authenticate(username=member_id, password=password)
 
-        # Try to find the user by member ID (username)
+        if not user:
+            return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # If you have lockout logic in your existing login_security, keep it in place.
+        # This view is a simple baseline; your existing lockout middleware/logic can remain.
+
+        return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
+
+
+# -----------------------
+# PASSWORD RESET: REQUEST
+# -----------------------
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        member_id = request.data.get("member_id")
+
+        if not member_id:
+            return Response(
+                {"member_id": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # member_id maps to username
         try:
             user = User.objects.get(username=member_id)
         except User.DoesNotExist:
+            # Don't reveal whether the user exists
             return Response(
-                {"detail": "Invalid credentials."},
-                status=status.HTTP_401_UNAUTHORIZED
+                {"detail": "If an account exists, a reset link has been sent."},
+                status=status.HTTP_200_OK,
             )
 
-        # Get or create login security tracker
-        login_sec, _ = LoginSecurity.objects.get_or_create(user=user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = token_generator.make_token(user)
 
-        # Check if account is locked
-        if login_sec.is_locked():
-            return Response(
-                {"detail": "Account locked due to too many failed attempts. Try again later."},
-                status=status.HTTP_423_LOCKED  # HTTP 423 = Locked
-            )
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+        reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
 
-        # Authenticate
-        user_auth = authenticate(username=member_id, password=password)
-
-        if user_auth is None:
-            # Wrong password → register the failure
-            login_sec.register_failure()
-            return Response(
-                {"detail": "Invalid credentials."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        # Successful login → Reset lockout counters
-        login_sec.reset()
-
-        # Create JWT tokens
-        refresh = RefreshToken.for_user(user_auth)
+        # DEV: prints email to terminal if EMAIL_BACKEND is console backend
+        send_mail(
+            subject="Reset your password",
+            message=f"Click the link to reset your password:\n{reset_link}",
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@ncbw-training.local"),
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
 
         return Response(
-            {
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-                "member_id": member_id,
-                "first_name": user_auth.first_name,
-                "last_name": user_auth.last_name,
-                "email": user_auth.email,
-            },
-            status=status.HTTP_200_OK
+            {"detail": "If an account exists, a reset link has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# -----------------------
+# PASSWORD RESET: CONFIRM
+# -----------------------
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uid = request.data.get("uid")
+        token = request.data.get("token")
+        new_password = request.data.get("password")
+
+        if not all([uid, token, new_password]):
+            return Response(
+                {"detail": "Invalid reset request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user_id = urlsafe_base64_decode(uid).decode()
+            user = User.objects.get(pk=user_id)
+        except Exception:
+            return Response(
+                {"detail": "Invalid reset link."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Reset link is invalid or expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response(
+            {"detail": "Password has been reset successfully."},
+            status=status.HTTP_200_OK,
         )

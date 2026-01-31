@@ -1,6 +1,18 @@
+# Python virtual environments
 venv/
+backend/venv/
+.venv/
+
+# Python junk
 __pycache__/
 *.pyc
+
+# Django
 db.sqlite3
+
+# Env + logs
 .env
 *.log
+
+# Frontend
+frontend/node_modules/
