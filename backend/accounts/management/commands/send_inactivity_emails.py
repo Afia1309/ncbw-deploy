@@ -1,4 +1,5 @@
 # This file is in charge of automatically sending an email reminder to trainees who have been inactive for a certain period of time
+# This command DOES NOT modify training progress
 # (!) Currently it only tracks last login, but will be updated to track last time since a module was completed (!)
 
 from django.core.management.base import BaseCommand # base class for creating custom Django management commands
@@ -33,7 +34,7 @@ class Command(BaseCommand):
             is_active=True,
         )
 
-	# No inactive users, exit early
+        # No inactive users, exit early
         if not inactive_users.exists():
             self.stdout.write(self.style.SUCCESS("No inactive users found."))
             return
