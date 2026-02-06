@@ -10,13 +10,51 @@ def me(request):
     return Response({
         "name": getattr(u, "username", "Test User"),
         "member_id": getattr(u, "username", "12345"),
-        "track": "Leadership Track",
+        "track": "Leadership Track",  # change later to role-based track if you want
     })
 
 @api_view(["GET"])
 def my_modules(request):
+    # Stub data that matches Deliverable 3: title + skill + status
     return Response([
-        {"id": 1, "title": "Orientation", "required": True, "completed": True},
-        {"id": 2, "title": "Leadership Foundations", "required": True, "completed": False},
-        {"id": 3, "title": "Community Engagement", "required": True, "completed": False},
+        {
+            "id": 1,
+            "title": "Leadership & Strategic Visioning",
+            "required": True,
+            "status": "Completed",
+            "completed": True,
+            "locked": False,
+        },
+        {
+            "id": 2,
+            "title": "Effective Public Speaking & Communication",
+            "required": True,
+            "status": "In Progress",
+            "completed": False,
+            "locked": False,
+        },
+        {
+            "id": 3,
+            "title": "Conflict Resolution & Mediation",
+            "required": True,
+            "status": "Not Started",
+            "completed": False,
+            "locked": True,  # locked until previous module complete
+        },
+        {
+            "id": 4,
+            "title": "Delegation & Time Management",
+            "required": True,
+            "status": "Not Started",
+            "completed": False,
+            "locked": True,
+        },
+        {
+            "id": 5,
+            "title": "Organizational Culture & Ethics",
+            "required": True,
+            "status": "Not Started",
+            "completed": False,
+            "locked": True,
+        },
     ])
