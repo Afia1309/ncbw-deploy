@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/apiClient";
 import "./Dashboard.css";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function MemberDashboard() {
   const [profile, setProfile] = useState(null);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     (async () => {
@@ -49,17 +52,56 @@ export default function MemberDashboard() {
         <div className="dash-profile">
           <div className="dash-avatar" aria-hidden />
           <div className="dash-name">{profile.name || "Member"}</div>
-          <div className="dash-id">Member ID: {profile.member_id || "—"}</div>
+          <div className="dash-id">Member ID: {profile.member_id || ""}</div>
         </div>
 
-        <nav className="dash-nav">
-          <button className="dash-nav-item active">Dashboard</button>
-          <button className="dash-nav-item">Notifications</button>
-          <button className="dash-nav-item">Manage Profile</button>
-          <button className="dash-nav-item">Modules</button>
-          <button className="dash-nav-item">Account</button>
-          <button className="dash-nav-item danger">Logout</button>
-        </nav>
+<nav className="dash-nav">
+  <button
+    className={`dash-nav-item ${location.pathname === "/member/dashboard" ? "active" : ""}`}
+    onClick={() => navigate("/member/dashboard")}
+  >
+    Dashboard
+  </button>
+
+  <button
+    className={`dash-nav-item ${location.pathname === "/member/notifications" ? "active" : ""}`}
+    onClick={() => navigate("/member/notifications")}
+  >
+    Notifications
+  </button>
+
+  <button
+    className={`dash-nav-item ${location.pathname === "/member/profile" ? "active" : ""}`}
+    onClick={() => navigate("/member/profile")}
+  >
+    Manage Profile
+  </button>
+
+  <button
+    className={`dash-nav-item ${location.pathname === "/member/modules" ? "active" : ""}`}
+    onClick={() => navigate("/member/modules")}
+  >
+    Modules
+  </button>
+
+  <button
+    className={`dash-nav-item ${location.pathname === "/member/account" ? "active" : ""}`}
+    onClick={() => navigate("/member/account")}
+  >
+    Account
+  </button>
+
+  <button
+    className="dash-nav-item danger"
+    onClick={() => {
+      // later you can clear JWT tokens here if you add them
+      navigate("/login");
+    }}
+  >
+    Logout
+  </button>
+</nav>
+
       </aside>
 
       {/* MAIN */}
@@ -104,7 +146,7 @@ export default function MemberDashboard() {
           </div>
         </section>
 
-        
+        {/* Optional: add more cards later */}
       </main>
     </div>
   );

@@ -25,7 +25,7 @@ export default function Login() {
         member_id: memberId,
         password,
       });
-      navigate("/dashboard");
+      navigate("/member/dashboard");
     } catch (err) {
       console.error(err);
 
