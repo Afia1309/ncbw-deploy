@@ -1,4 +1,4 @@
-import MemberLayout from "../components/MemberLayout";
+import MemberLayout from "../../components/MemberLayout";
 import "./Dashboard.css";
 
 const mockProfile = {

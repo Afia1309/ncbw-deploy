@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import "../pages/Dashboard.css";
+import "../src/pages/Dashboard.css";
 
 export default function MemberLayout({ title, children }) {
   const navigate = useNavigate();

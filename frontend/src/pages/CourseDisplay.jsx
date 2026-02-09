@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import MemberLayout from "../components/MemberLayout";
+import MemberLayout from "../../components/MemberLayout";
 import "./Dashboard.css";
 
 const sections = [

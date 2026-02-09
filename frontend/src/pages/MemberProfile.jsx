@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api/apiClient";
-import MemberLayout from "../components/MemberLayout";
+import MemberLayout from "../../components/MemberLayout";
 
 export default function MemberProfile() {
   const [profile, setProfile] = useState(null);
