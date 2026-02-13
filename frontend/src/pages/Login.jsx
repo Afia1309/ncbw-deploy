@@ -21,30 +21,30 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await api.post("/auth/login/", {
-        member_id: memberId,
-        password,
+      
+      const response = await api.post("/token/", {
+        username: memberId,  
+        password: password,
       });
+
+      
+      localStorage.setItem("access_token", response.data.access);
+      localStorage.setItem("refresh_token", response.data.refresh);
+     
       navigate("/member/dashboard");
     } catch (err) {
-      console.error(err);
+      console.error("Login error:", err.response?.data);
 
       if (err.response && err.response.data) {
         const data = err.response.data;
-        const newFieldErrors = {};
-
-        Object.entries(data).forEach(([key, value]) => {
-          if (Array.isArray(value)) newFieldErrors[key] = value.join(" ");
-          else if (typeof value === "string") newFieldErrors[key] = value;
-        });
-
-        setFieldErrors(newFieldErrors);
-
-        // lockout sometimes returns 423 with detail message
-        if (data.detail || data.non_field_errors) {
-          setError(data.detail || data.non_field_errors.join(" "));
+        
+        // Handle error response
+        if (data.detail) {
+          setError(data.detail);
+        } else if (data.non_field_errors) {
+          setError(data.non_field_errors.join(" "));
         } else {
-          setError("Please fix the errors below.");
+          setError("Invalid Member ID or password.");
         }
       } else {
         setError("Something went wrong. Please try again.");
@@ -80,11 +80,9 @@ export default function Login() {
               type="text"
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
+              placeholder="Enter your Member ID"
               required
             />
-            {fieldErrors.member_id && (
-              <div className="field-error">{fieldErrors.member_id}</div>
-            )}
           </div>
 
           <div className="auth-field">
@@ -96,6 +94,7 @@ export default function Login() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
                 required
               />
               <button
@@ -110,10 +109,6 @@ export default function Login() {
             <div style={{ marginTop: 10, textAlign: "right" }}>
               <Link to="/forgot-password">Forgot password?</Link>
             </div>
-
-            {fieldErrors.password && (
-              <div className="field-error">{fieldErrors.password}</div>
-            )}
           </div>
 
           <button type="submit" className="auth-button" disabled={loading}>
@@ -132,7 +127,7 @@ export default function Login() {
           )}
 
           <div className="auth-footer">
-            Create an account <Link to="/signup">here.</Link>
+            Don't have an account? <Link to="/signup">Create one here.</Link>
           </div>
         </form>
       </div>

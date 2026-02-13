@@ -3,5 +3,6 @@ from . import views
 
 urlpatterns = [
     path("me/", views.me),
-    path("me/modules/", views.my_modules),
+    path("dashboard/", views.dashboard),
+    path("modules/<int:module_id>/status/", views.update_module_status),
 ]

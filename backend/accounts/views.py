@@ -1,180 +1,236 @@
-from django.contrib.auth import authenticate, get_user_model
-from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes
-from django.conf import settings
-from django.core.mail import send_mail
-
-from rest_framework.views import APIView
+from django.contrib.auth.models import User
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from django.db import transaction
+from rest_framework.permissions import IsAuthenticated
+import re
 
-User = get_user_model()
-token_generator = PasswordResetTokenGenerator()
+from .models import Profile, LoginSecurity
+from training.models import Track, Enrollment
 
 
-# -----------------------
-# REGISTER (Member ID = username)
-# -----------------------
-class RegisterView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        data = request.data
-
-        # frontend sends member_id
-        member_id = data.get("member_id")
-        email = data.get("email")
-        password = data.get("password")
-        first_name = data.get("first_name", "")
-        last_name = data.get("last_name", "")
-
-        errors = {}
-
-        if not member_id:
-            errors["member_id"] = ["This field is required."]
-        else:
-            # member_id is stored as username
-            if User.objects.filter(username=member_id).exists():
-                errors["member_id"] = ["This Member ID is already taken."]
-
-        if not email:
-            errors["email"] = ["This field is required."]
-        else:
-            if User.objects.filter(email=email).exists():
-                errors["email"] = ["This email is already in use."]
-
-        if not password:
-            errors["password"] = ["This field is required."]
-
-        if errors:
-            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
-        user = User.objects.create_user(
-            username=member_id,
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-        )
-
+def validate_password_strength(password):
+    """Validate password meets requirements"""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one number"
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character"
+    return True, ""
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_profile(request):
+    try:
+        user = request.user
+        profile = user.profile
+        
+        # Update User fields
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        email = request.data.get('email')
+        
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
+        if email:
+            # Check if email is already taken by another user
+            if User.objects.filter(email=email).exclude(id=user.id).exists():
+                return Response(
+                    {'email': ['This email is already registered.']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user.email = email
+        
+        user.save()
+        
+        # Update Profile fields
+        phone = request.data.get('phone')
+        position = request.data.get('position')
+        
+        if phone is not None:
+            profile.phone = phone
+        if position is not None:
+            profile.position = position
+        
+        profile.save()
+        
+        # Get enrollment info
+        enrollment = Enrollment.objects.filter(user=user).first()
+        
+        return Response({
+            'message': 'Profile updated successfully',
+            'user': {
+                'name': f"{user.first_name} {user.last_name}".strip() or user.username,
+                'member_id': profile.member_id or user.username,
+                'email': user.email,
+                'phone': profile.phone,
+                'position': profile.position,
+                'role': profile.role,
+                'track': enrollment.track.name if enrollment else 'Leadership Track',
+                'phase': enrollment.phase if enrollment else 'Phase 1',
+                'cohort': enrollment.cohort if enrollment else '2026'
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Update profile error: {str(e)}")
         return Response(
-            {"detail": "Account created successfully.", "id": user.id},
-            status=status.HTTP_201_CREATED,
+            {'detail': f'Failed to update profile: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
 
-# -----------------------
-# LOGIN (Member ID = username)
-# -----------------------
-class LoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        member_id = request.data.get("member_id")
-        password = request.data.get("password")
-
-        if not member_id or not password:
+# Add this new endpoint for changing password
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    try:
+        user = request.user
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+        
+        # Check current password
+        if not user.check_password(current_password):
             return Response(
-                {"detail": "Member ID and password are required."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {'current_password': ['Current password is incorrect.']},
+                status=status.HTTP_400_BAD_REQUEST
             )
-
-        # authenticate expects username
-        user = authenticate(username=member_id, password=password)
-
-        if not user:
-            return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # If you have lockout logic in your existing login_security, keep it in place.
-        # This view is a simple baseline; your existing lockout middleware/logic can remain.
-
-        return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
-
-
-# -----------------------
-# PASSWORD RESET: REQUEST
-# -----------------------
-class PasswordResetRequestView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        member_id = request.data.get("member_id")
-
-        if not member_id:
+        
+        # Check if new passwords match
+        if new_password != confirm_password:
             return Response(
-                {"member_id": ["This field is required."]},
-                status=status.HTTP_400_BAD_REQUEST,
+                {'new_password': ['Passwords do not match.']},
+                status=status.HTTP_400_BAD_REQUEST
             )
-
-        # member_id maps to username
-        try:
-            user = User.objects.get(username=member_id)
-        except User.DoesNotExist:
-            # Don't reveal whether the user exists
+        
+        # Validate password strength
+        is_valid, error_msg = validate_password_strength(new_password)
+        if not is_valid:
             return Response(
-                {"detail": "If an account exists, a reset link has been sent."},
-                status=status.HTTP_200_OK,
+                {'new_password': [error_msg]},
+                status=status.HTTP_400_BAD_REQUEST
             )
-
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = token_generator.make_token(user)
-
-        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-        reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
-
-        # DEV: prints email to terminal if EMAIL_BACKEND is console backend
-        send_mail(
-            subject="Reset your password",
-            message=f"Click the link to reset your password:\n{reset_link}",
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@ncbw-training.local"),
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-
-        return Response(
-            {"detail": "If an account exists, a reset link has been sent."},
-            status=status.HTTP_200_OK,
-        )
-
-
-# -----------------------
-# PASSWORD RESET: CONFIRM
-# -----------------------
-class PasswordResetConfirmView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        uid = request.data.get("uid")
-        token = request.data.get("token")
-        new_password = request.data.get("password")
-
-        if not all([uid, token, new_password]):
-            return Response(
-                {"detail": "Invalid reset request."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            user_id = urlsafe_base64_decode(uid).decode()
-            user = User.objects.get(pk=user_id)
-        except Exception:
-            return Response(
-                {"detail": "Invalid reset link."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Reset link is invalid or expired."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+        
+        # Set new password
         user.set_password(new_password)
         user.save()
-
+        
+        # Reset login security
+        if hasattr(user, 'login_security'):
+            user.login_security.reset()
+        
+        return Response({
+            'message': 'Password changed successfully'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Change password error: {str(e)}")
         return Response(
-            {"detail": "Password has been reset successfully."},
-            status=status.HTTP_200_OK,
+            {'detail': f'Failed to change password: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register(request):
+    try:
+        # Get data from request
+        member_id = request.data.get('member_id')
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        email = request.data.get('email')
+        phone_number = request.data.get('phone_number')
+        position = request.data.get('position')
+        password = request.data.get('password')
+        password_confirm = request.data.get('password_confirm')
+        
+        errors = {}
+        
+
+        
+        # Check if passwords match
+        if password != password_confirm:
+            errors['password_confirm'] = ["Passwords do not match."]
+        
+        # Validate password strength
+        is_valid, pwd_error = validate_password_strength(password)
+        if not is_valid:
+            errors['password'] = [pwd_error]
+        
+        # Check if username (member_id) already exists
+        if User.objects.filter(username=member_id).exists():
+            errors['member_id'] = ["This Member ID is already taken."]
+        
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            errors['email'] = ["This email is already registered."]
+        
+        # If there are validation errors, return them
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # --- CREATE USER ---
+        with transaction.atomic():
+            # Create Django user - use member_id as username
+            user = User.objects.create_user(
+                username=member_id,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # Update or create profile with additional fields
+            if hasattr(user, 'profile'):
+                profile = user.profile
+            else:
+                profile = Profile.objects.create(user=user)
+            
+            # Set profile fields
+            profile.member_id = member_id
+            profile.phone = phone_number or ""
+            profile.position = position
+            profile.role = 'trainee'
+            profile.save()
+            
+            # Create LoginSecurity if it doesn't exist
+            if not hasattr(user, 'login_security'):
+                LoginSecurity.objects.create(user=user)
+            
+            # Auto-enroll in Leadership Track
+            track = Track.objects.first()
+            if track:
+                Enrollment.objects.create(
+                    user=user,
+                    track=track,
+                    cohort='2026',
+                    phase='Phase 1'
+                )
+        
+        return Response({
+            'message': 'Account created successfully',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'member_id': profile.member_id
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        print(f"Registration error: {str(e)}")  
+        return Response(
+            {'detail': f'Registration failed: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
         )

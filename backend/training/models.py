@@ -1,58 +1,50 @@
-# Skeleton framework (!)
-# Will need to be tweaked when Modules are built
-from django.conf import settings
 from django.db import models
-from django.utils import timezone
+from django.conf import settings
 
 
-# Placeholder model for future training modules
-# (Represents a single training course/module)
-class TrainingModule(models.Model):
-
-    title = models.CharField(max_length=255) # Name
-    is_active = models.BooleanField(default=True) # Is module currently active/assigned
-    created_at = models.DateTimeField(auto_now_add=True) # Timestamp
+class Track(models.Model):
+    name = models.CharField(max_length=120)
 
     def __str__(self):
-        return self.title
+        return self.name
 
 
-# Tracks a user's progress in a training module.
-class UserTrainingProgress(models.Model):
+class Module(models.Model):
+    track = models.ForeignKey(Track, on_delete=models.CASCADE, related_name="modules")
+    title = models.CharField(max_length=200)
+    required = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=1)
+    due_date = models.DateField(null=True, blank=True)
 
-    # Which user/trainee
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-	#
-    )
-    # Which module
-    module = models.ForeignKey(
-        TrainingModule,
-        on_delete=models.CASCADE
-	#
-    )
-    # Additional variables
-    progress_percent = models.IntegerField(default=0)
-    completed = models.BooleanField(default=False)
+    def __str__(self):
+        return f"{self.track.name} - {self.title}"
+
+
+class Enrollment(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    track = models.ForeignKey(Track, on_delete=models.CASCADE)
+    cohort = models.CharField(max_length=120, blank=True, default="")
+    phase = models.CharField(max_length=120, blank=True, default="Phase 1")
+
+    def __str__(self):
+        return f"{self.user} -> {self.track.name}"
+
+
+class ModuleProgress(models.Model):
+    STATUS_CHOICES = [
+        ("not_started", "Not Started"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    module = models.ForeignKey(Module, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="not_started")
+    last_activity = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    last_activity = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ("user", "module") # Prevent duplicate rows (same user + same module)
-
-    # Mark when a user interacts with the module (video, question, etc.)
-    def mark_activity(self):
-        self.last_activity = timezone.now()
-        self.save(update_fields=["last_activity"])
-
-    # Reset progress due to inactivity
-    def reset_progress(self):
-
-        self.progress_percent = 0
-        self.completed = False
-        self.last_activity = timezone.now()
-        self.save()
+        unique_together = ("user", "module")
 
     def __str__(self):
-        return f"{self.user} - {self.module}"
+        return f"{self.user} {self.module.title} {self.status}"
