@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 token_generator = PasswordResetTokenGenerator()
@@ -90,7 +91,14 @@ class LoginView(APIView):
         # If you have lockout logic in your existing login_security, keep it in place.
         # This view is a simple baseline; your existing lockout middleware/logic can remain.
 
-        return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
+        # CREATE TOKENS
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        })
+        # return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
 
 
 # -----------------------

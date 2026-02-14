@@ -21,11 +21,18 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await api.post("/auth/login/", {
+
+    const res = await api.post("/auth/login/", {
         member_id: memberId,
         password,
-      });
-      navigate("/member/dashboard");
+    });
+
+    // Save Tokens
+    localStorage.setItem("access", res.data.access);
+    localStorage.setItem("refresh", res.data.refresh);
+
+    navigate("/member/dashboard");
+
     } catch (err) {
       console.error(err);
 

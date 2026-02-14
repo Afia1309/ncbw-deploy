@@ -1,9 +1,25 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { fetchUnreadCount } from "../src/api/notifications";
 import "../src/pages/Dashboard.css";
 
 export default function MemberLayout({ title, children }) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [unread, setUnread] = useState(0); // Unread notification counter state
+  const token = localStorage.getItem("access"); // Authentication token from login
+
+  // Fetch unread count when layout loads
+  useEffect(() => {
+    if (!token) return;
+
+    fetchUnreadCount(token).then((data) => {
+      if (data?.unread !== undefined) {
+        setUnread(data.unread);
+      }
+    });
+  }, [token]);
 
   const navItems = [
     { label: "Dashboard", path: "/member/dashboard" },
@@ -30,6 +46,9 @@ export default function MemberLayout({ title, children }) {
               onClick={() => navigate(item.path)}
             >
               {item.label}
+              {item.label === "Messages" && unread > 0 && (
+                <span className="notif-badge">({unread})</span>
+              )}
             </button>
           ))}
 

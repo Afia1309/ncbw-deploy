@@ -243,6 +243,15 @@
   color: #9ca3af;
 }
 
+/* ====== Notifications ====== */
+/* (Feel free to move to a place that makes sense for you - EB) */
+
+.notif-badge {
+  color: #facc15;
+  font-weight: bold;
+  margin-left: 6px;
+}
+
 /* ====== Messages ====== */
 
 .messages-card {

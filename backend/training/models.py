@@ -23,14 +23,14 @@ class UserTrainingProgress(models.Model):
     # Which user/trainee
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-	#
+        on_delete=models.CASCADE,
+        related_name="training_progress"
     )
     # Which module
     module = models.ForeignKey(
         TrainingModule,
-        on_delete=models.CASCADE
-	#
+        on_delete=models.CASCADE,
+        related_name="user_progress"
     )
     # Additional variables
     progress_percent = models.IntegerField(default=0)
