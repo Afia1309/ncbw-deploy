@@ -168,3 +168,4 @@ DEFAULT_FROM_EMAIL = "no-reply@ncbw-training.local"
 # Frontend URL (used for password reset links)
 # --------------------------------------------------
 FRONTEND_URL = "http://localhost:5173"
+

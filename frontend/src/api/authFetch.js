@@ -1,7 +1,7 @@
 export async function authFetch(url, options = {}) {
-  let access = localStorage.getItem("access");
+  let access = localStorage.getItem("access_token");
 
-  const res = await fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers: {
       ...(options.headers || {}),
@@ -10,12 +10,12 @@ export async function authFetch(url, options = {}) {
   });
 
   // Auto-refresh token if expired
-  if (res.status === 401) {
-    const refresh = localStorage.getItem("refresh");
+  if (response.status === 401) {
+    const refresh = localStorage.getItem("refresh_token");
 
     // ask backend for new access token
     const refreshRes = await fetch(
-      "http://127.0.0.1:8000/api/auth/refresh/",
+      "http://127.0.0.1:8000/api/token/refresh/",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -31,7 +31,7 @@ export async function authFetch(url, options = {}) {
 
     // save new token
     const data = await refreshRes.json();
-    localStorage.setItem("access", data.access);
+    localStorage.setItem("access_token", data.access);
 
     // retry original request
     return fetch(url, {
@@ -43,5 +43,5 @@ export async function authFetch(url, options = {}) {
     });
   }
 
-  return res;
+  return response;
 }

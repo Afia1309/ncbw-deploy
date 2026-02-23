@@ -1,10 +1,10 @@
-/* ====== Layout shell ====== */
+/* ====== Base layout ====== */
 
 .dash-page {
   min-height: 100vh;
   width: 100vw;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 220px 1fr; /* narrower sidebar so content is wider */
   background: #111827;
   color: #f9fafb;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -26,7 +26,7 @@
   font-weight: 800;
   font-size: 20px;
   letter-spacing: 0.15em;
-  color: #facc15;
+  color: #c9a227; /* muted gold */
 }
 
 .dash-nav {
@@ -52,7 +52,7 @@
 }
 
 .dash-sidebar-link.active {
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
   font-weight: 600;
 }
@@ -88,7 +88,7 @@
   height: 36px;
   width: 36px;
   border-radius: 999px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -109,7 +109,7 @@
 }
 
 .dash-content {
-  padding: 24px 32px 40px;
+  padding: 24px 28px 40px; /* slightly reduced horizontal padding for more width */
 }
 
 /* ====== Generic card ====== */
@@ -128,7 +128,9 @@
   margin-bottom: 12px;
 }
 
-/* ====== Progress ring & bar (Dashboard) ====== */
+/* =========================================================
+   MEMBER DASHBOARD
+   ========================================================= */
 
 .dash-dashboard-grid {
   display: grid;
@@ -149,12 +151,14 @@
   gap: 32px;
 }
 
+/* Progress donut */
+
 .dash-progress-circle {
   position: relative;
   height: 200px;
   width: 200px;
   border-radius: 999px;
-  background: conic-gradient(#facc15 0deg, #facc15 234deg, #374151 234deg);
+  background: conic-gradient(#c9a227 0deg, #c9a227 234deg, #374151 234deg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -192,7 +196,7 @@
   font-size: 14px;
 }
 
-/* Simple horizontal bar for course progress */
+/* Course rows / progress bars */
 
 .dash-course-row {
   margin-top: 10px;
@@ -215,10 +219,10 @@
 .dash-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
 }
 
-/* ====== Reminders ====== */
+/* Reminders */
 
 .reminders-card {
   display: flex;
@@ -243,8 +247,7 @@
   color: #9ca3af;
 }
 
-/* ====== Notifications ====== */
-/* (Feel free to move to a place that makes sense for you - EB) */
+/* Notifications */
 
 .notif-badge {
   color: #facc15;
@@ -252,7 +255,7 @@
   margin-left: 6px;
 }
 
-/* ====== Messages ====== */
+/* Messages */
 
 .messages-card {
   display: flex;
@@ -287,7 +290,9 @@
   color: #e5e7eb;
 }
 
-/* ====== Course list (Course Selection) ====== */
+/* =========================================================
+   COURSE SELECTION (member)
+   ========================================================= */
 
 .course-list {
   display: flex;
@@ -296,7 +301,7 @@
 }
 
 .course-item {
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   border-radius: 12px;
   padding: 14px 18px;
   color: #111827;
@@ -346,7 +351,7 @@
   border: none;
   padding: 8px 16px;
   background: #111827;
-  color: #facc15;
+  color: #c9a227; /* muted gold text */
   font-size: 13px;
   cursor: pointer;
 }
@@ -365,12 +370,14 @@
   text-align: center;
 }
 
-/* ====== Course Display (sections list) ====== */
+/* =========================================================
+   COURSE DISPLAY (member)
+   ========================================================= */
 
 .course-display-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
-  gap: 24px;
+  gap: 20px; /* slightly reduced gap so cards feel wider */
 }
 
 .course-details-card {
@@ -403,7 +410,7 @@
   border-radius: 999px;
   border: none;
   padding: 10px 18px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
   font-weight: 600;
   font-size: 14px;
@@ -457,9 +464,9 @@
 }
 
 .section-status-pill.complete {
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
-  border-color: #facc15;
+  border-color: #c9a227;
 }
 
 .section-btn {
@@ -467,7 +474,7 @@
   border-radius: 999px;
   border: none;
   padding: 7px 12px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
   cursor: pointer;
 }
@@ -477,7 +484,9 @@
   color: #9ca3af;
 }
 
-/* ====== Course Material ====== */
+/* =========================================================
+   COURSE MATERIAL (member)
+   ========================================================= */
 
 .course-material-grid {
   display: grid;
@@ -509,7 +518,7 @@
 }
 
 .sidebar-section-item.active {
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
 }
 
@@ -543,7 +552,7 @@
   height: 70px;
   width: 70px;
   border-radius: 999px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -566,17 +575,19 @@
   margin-bottom: 12px;
 }
 
-/* ====== Member Profile ====== */
+/* =========================================================
+   MEMBER / ADMIN PROFILE
+   ========================================================= */
 
 .profile-wrapper {
-  max-width: 880px;
+  max-width: 1040px; /* wider profile container */
 }
 
 .profile-card {
   background: #030712;
   border-radius: 20px;
   border: 1px solid #374151;
-  padding: 24px 26px;
+  padding: 28px 30px; /* slightly more internal padding */
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 24px;
@@ -586,7 +597,7 @@
   height: 96px;
   width: 96px;
   border-radius: 999px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -603,7 +614,7 @@
   border-radius: 999px;
   border: none;
   padding: 8px 14px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
   font-size: 13px;
   cursor: pointer;
@@ -645,14 +656,251 @@
   border-radius: 999px;
   border: none;
   padding: 9px 18px;
-  background: #facc15;
+  background: #c9a227; /* muted gold */
   color: #111827;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
 }
 
-/* ====== Responsive tweaks ====== */
+/* =========================================================
+   ADMIN DASHBOARD
+   ========================================================= */
+
+.admin-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
+  gap: 20px; /* slightly smaller gap */
+  margin-bottom: 24px;
+}
+
+.admin-middle-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.6fr);
+  gap: 20px; /* slightly smaller gap */
+  margin-bottom: 24px;
+}
+
+.admin-card-gold {
+  background: #c9a227; /* muted gold */
+  border-radius: 18px;
+  padding: 18px 22px;
+  color: #111827;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.admin-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.admin-card-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.admin-link-button {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  color: #111827;
+}
+
+.admin-published-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.admin-published-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.admin-published-footer {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+}
+
+/* Status pills */
+
+.admin-status-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #fff;
+}
+
+.admin-status-pill.active {
+  background: #22c55e;
+}
+
+.admin-status-pill.draft {
+  background: #f97316;
+}
+
+/* Recent messages */
+
+.admin-recent-messages .admin-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-message-item {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.admin-message-name {
+  font-weight: 600;
+}
+
+.admin-message-preview {
+  margin-top: 2px;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.admin-message-time {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* Charts */
+
+.admin-chart-card {
+  position: relative;
+}
+
+.admin-chart {
+  margin-top: 12px;
+  height: 180px;
+  position: relative;
+}
+
+/* simple "line" chart */
+
+.admin-line-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  border-left: 1px solid #4b5563;
+  border-bottom: 1px solid #4b5563;
+  padding: 10px 14px 24px;
+}
+
+.admin-line-point-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+.admin-line-point {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #c9a227; /* muted gold */
+  border: 2px solid #c9a227;
+}
+
+/* simple bar chart */
+
+.admin-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  border-left: 1px solid #4b5563;
+  border-bottom: 1px solid #4b5563;
+  padding: 10px 14px 24px;
+}
+
+.admin-bar-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-bar {
+  width: 60%;
+  border-radius: 6px 6px 0 0;
+  background: #c9a227; /* muted gold */
+}
+
+.admin-chart-xaxis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 18px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* Recent Feedback */
+
+.admin-feedback-card {
+  margin-top: 8px;
+}
+
+.admin-feedback-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.admin-feedback-item {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.admin-feedback-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.admin-feedback-name {
+  font-weight: 600;
+}
+
+.admin-feedback-time {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.admin-feedback-text {
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.admin-feedback-rating {
+  color: #c9a227; /* muted gold stars */
+  font-size: 14px;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
 
 @media (max-width: 960px) {
   .dash-page {
@@ -679,7 +927,10 @@
   .dash-dashboard-bottom,
   .course-display-grid,
   .course-material-grid,
-  .profile-card {
+  .profile-card,
+  .admin-top-grid,
+  .admin-middle-grid,
+  .admin-feedback-row {
     grid-template-columns: 1fr;
   }
 }

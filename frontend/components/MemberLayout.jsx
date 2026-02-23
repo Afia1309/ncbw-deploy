@@ -1,14 +1,16 @@
-import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { fetchUnreadCount } from "../src/api/notifications";
+import api from "../src/api/apiClient";  
 import "../src/pages/Dashboard.css";
 
 export default function MemberLayout({ title, children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [userName, setUserName] = useState("");
 
   const [unread, setUnread] = useState(0); // Unread notification counter state
-  const token = localStorage.getItem("access"); // Authentication token from login
+  const token = localStorage.getItem("access_token"); // Authentication token from login
 
   // Fetch unread count when layout loads
   useEffect(() => {
@@ -27,6 +29,35 @@ export default function MemberLayout({ title, children }) {
     { label: "Courses", path: "/member/courses" },
     { label: "Messages", path: "/member/notifications" },
   ];
+
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      
+      const response = await api.get("/training/me/");
+      setUserName(response.data.name);
+    } catch (err) {
+      console.error("Failed to fetch user:", err);
+    }
+  };
+
+  const getInitial = () => {
+    if (userName) {
+      return userName.charAt(0).toUpperCase();
+    }
+    return "U";
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    navigate("/login");
+  };
 
   return (
     <div className="dash-page">
@@ -55,7 +86,7 @@ export default function MemberLayout({ title, children }) {
           <button
             type="button"
             className="dash-sidebar-link signout"
-            onClick={() => navigate("/login")}
+            onClick={handleSignOut}
           >
             Sign Out
           </button>
@@ -66,7 +97,9 @@ export default function MemberLayout({ title, children }) {
       <main className="dash-main">
         <header className="dash-header">
           <div className="dash-header-left">
-            <div className="dash-avatar">J</div>
+            <div className="dash-avatar">
+              {getInitial()}
+            </div>
             <div className="dash-header-text">
               <div className="dash-header-title">{title}</div>
             </div>

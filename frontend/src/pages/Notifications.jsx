@@ -5,7 +5,7 @@ import { fetchNotifications, markAsRead } from "../api/notifications"; // API to
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
-  const token = localStorage.getItem("access");
+  const token = localStorage.getItem("access_token");
 
   useEffect(() => {
   if (!token) return; // prevents crash if not logged in

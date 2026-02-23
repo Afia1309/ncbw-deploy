@@ -1,79 +1,134 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import MemberLayout from "../../components/MemberLayout";
 import "./Dashboard.css";
 
-const sections = [
-  "What is Strategic Planning?",
-  "Creating Your Personal Leadership Plan",
-  "Leadership Fundamentals",
-  "Strategic Thinking",
-  "Defining Your Leadership Values and Vision",
-];
-
-const transcript = `
-[00:00]
-Welcome to this session on Leadership Fundamentals. In this video, we'll explore
-the key concepts and practical applications that will help you excel in your
-leadership role.
-
-[00:15]
-Let's begin by understanding the fundamental principles. These core ideas form
-the foundation of effective leadership and organizational success.
-
-[00:45]
-Throughout this course, you'll learn how to apply these concepts in real-world
-scenarios. We'll provide examples from successful organizations and leaders.
-
-[01:20]
-It's important to take notes and reflect on how these principles can be applied
-to your specific situation and leadership context.
-`;
-
 export default function CourseMaterial() {
-  const activeIndex = 2; // "Leadership Fundamentals" – you can hook this to URL later
+  const { materialId } = useParams();
+  const navigate = useNavigate();
+  const [module, setModule] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchModuleDetails();
+  }, [materialId]);
+
+  const fetchModuleDetails = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch('http://localhost:8000/api/training/dashboard/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      const foundModule = data.required_modules.find(m => m.id === parseInt(materialId));
+      setModule(foundModule);
+    } catch (err) {
+      console.error('Failed to fetch module:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateModuleStatus = async (newStatus) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      await fetch(`http://localhost:8000/api/training/modules/${materialId}/status/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      // Refresh module data
+      fetchModuleDetails();
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    }
+  };
+
+  if (loading || !module) {
+    return (
+      <MemberLayout title="Loading...">
+        <div className="dash-loading">Loading course material...</div>
+      </MemberLayout>
+    );
+  }
+
+  const isLocked = module.locked;
+  const isComplete = module.status === 'completed';
+  const isInProgress = module.status === 'in_progress';
 
   return (
-    <MemberLayout title="Leadership Fundamentals">
+    <MemberLayout title={module.title}>
       <div className="course-material-grid">
-        {/* Left side: section list */}
         <aside className="material-sidebar">
-          <div className="material-sidebar-title">Course Sections</div>
-          {sections.map((title, idx) => {
-            const complete = idx < activeIndex;
-            const locked = idx > activeIndex + 1;
-
-            const classNames = [
-              "sidebar-section-item",
-              idx === activeIndex ? "active" : "",
-              complete ? "complete" : "",
-              locked ? "locked" : "",
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-            return (
-              <div key={title} className={classNames}>
-                <span>{title}</span>
-                {complete && "✓"}
-              </div>
-            );
-          })}
+          <div className="material-sidebar-title">Course Information</div>
+          <div className="sidebar-section-item">
+            <span>Status</span>
+            <span className={`dash-status-badge ${module.status}`}>
+              {module.status.replace('_', ' ')}
+            </span>
+          </div>
+          <div className="sidebar-section-item">
+            <span>Required</span>
+            <span>{module.required ? 'Yes' : 'No'}</span>
+          </div>
+          {module.due_date && (
+            <div className="sidebar-section-item">
+              <span>Due Date</span>
+              <span>{new Date(module.due_date).toLocaleDateString()}</span>
+            </div>
+          )}
         </aside>
 
-        {/* Right side: video + transcript */}
         <div className="material-main">
           <div className="material-video">
-            <div className="material-video-play">▶</div>
-            <div>Video: Leadership Fundamentals</div>
-            <div style={{ fontSize: 12, marginTop: 4 }}>
-              YouTube by FutureLearn • 30 mins
+            <div className="material-video-placeholder">
+              <div className="material-video-icon">▶</div>
+              <div>Video: {module.title}</div>
             </div>
           </div>
 
-          <div className="material-transcript">
-            <h3>Transcript</h3>
-            {transcript.split("\n").map((line, i) => (
-              <p key={i}>{line.trim()}</p>
-            ))}
+          <div className="material-actions">
+            {!isLocked && !isComplete && (
+              <button
+                className="primary-btn"
+                onClick={() => updateModuleStatus(
+                  isInProgress ? 'completed' : 'in_progress'
+                )}
+              >
+                {isInProgress ? 'Mark Complete' : 'Start Module'}
+              </button>
+            )}
+            {isComplete && (
+              <button className="secondary-btn" disabled>
+                ✓ Completed
+              </button>
+            )}
+            {isLocked && (
+              <button className="secondary-btn" disabled>
+                🔒 Locked
+              </button>
+            )}
+          </div>
+
+          <div className="material-description">
+            <h3>About this course</h3>
+            <p>
+              This module covers essential concepts in {module.title}. 
+              Complete the required activities to master this topic.
+            </p>
           </div>
         </div>
       </div>
