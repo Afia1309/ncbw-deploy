@@ -247,6 +247,14 @@
   color: #9ca3af;
 }
 
+/* Notifications */
+
+.notif-badge {
+  color: #facc15;
+  font-weight: bold;
+  margin-left: 6px;
+}
+
 /* Messages */
 
 .messages-card {

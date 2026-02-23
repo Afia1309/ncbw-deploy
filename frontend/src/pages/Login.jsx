@@ -21,17 +21,18 @@ export default function Login() {
     setLoading(true);
 
     try {
-      
+
       const response = await api.post("/token/", {
-        username: memberId,  
-        password: password,
+          username: memberId,
+          password: password,
       });
 
-      
+      // Save Tokens
       localStorage.setItem("access_token", response.data.access);
       localStorage.setItem("refresh_token", response.data.refresh);
-     
+
       navigate("/member/dashboard");
+
     } catch (err) {
       console.error("Login error:", err.response?.data);
 
