@@ -107,6 +107,13 @@ def change_password(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check if current password matches new password
+        if user.check_password(new_password):
+            return Response(
+                {'new_password': ['New password must be different from current password.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+                    
         # Check if new passwords match
         if new_password != confirm_password:
             return Response(
