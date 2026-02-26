@@ -52,7 +52,7 @@
 }
 
 .dash-sidebar-link.active {
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
   font-weight: 600;
 }
@@ -88,7 +88,7 @@
   height: 36px;
   width: 36px;
   border-radius: 999px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -109,7 +109,7 @@
 }
 
 .dash-content {
-  padding: 24px 28px 40px; /* slightly reduced horizontal padding for more width */
+  padding: 24px 28px 40px;
 }
 
 /* ====== Generic card ====== */
@@ -219,7 +219,7 @@
 .dash-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
 }
 
 /* Reminders */
@@ -245,14 +245,6 @@
   margin-top: 4px;
   font-size: 12px;
   color: #9ca3af;
-}
-
-/* Notifications */
-
-.notif-badge {
-  color: #facc15;
-  font-weight: bold;
-  margin-left: 6px;
 }
 
 /* Messages */
@@ -301,7 +293,7 @@
 }
 
 .course-item {
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   border-radius: 12px;
   padding: 14px 18px;
   color: #111827;
@@ -351,7 +343,7 @@
   border: none;
   padding: 8px 16px;
   background: #111827;
-  color: #c9a227; /* muted gold text */
+  color: #c9a227;
   font-size: 13px;
   cursor: pointer;
 }
@@ -377,7 +369,7 @@
 .course-display-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
-  gap: 20px; /* slightly reduced gap so cards feel wider */
+  gap: 20px;
 }
 
 .course-details-card {
@@ -410,7 +402,7 @@
   border-radius: 999px;
   border: none;
   padding: 10px 18px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
   font-weight: 600;
   font-size: 14px;
@@ -464,7 +456,7 @@
 }
 
 .section-status-pill.complete {
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
   border-color: #c9a227;
 }
@@ -474,7 +466,7 @@
   border-radius: 999px;
   border: none;
   padding: 7px 12px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
   cursor: pointer;
 }
@@ -518,7 +510,7 @@
 }
 
 .sidebar-section-item.active {
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
 }
 
@@ -552,7 +544,7 @@
   height: 70px;
   width: 70px;
   border-radius: 999px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -580,14 +572,14 @@
    ========================================================= */
 
 .profile-wrapper {
-  max-width: 1040px; /* wider profile container */
+  max-width: 1040px;
 }
 
 .profile-card {
   background: #030712;
   border-radius: 20px;
   border: 1px solid #374151;
-  padding: 28px 30px; /* slightly more internal padding */
+  padding: 28px 30px;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 24px;
@@ -597,7 +589,7 @@
   height: 96px;
   width: 96px;
   border-radius: 999px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -614,7 +606,7 @@
   border-radius: 999px;
   border: none;
   padding: 8px 14px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
   font-size: 13px;
   cursor: pointer;
@@ -656,7 +648,7 @@
   border-radius: 999px;
   border: none;
   padding: 9px 18px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   color: #111827;
   font-weight: 600;
   font-size: 14px;
@@ -670,19 +662,19 @@
 .admin-top-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
-  gap: 20px; /* slightly smaller gap */
+  gap: 20px;
   margin-bottom: 24px;
 }
 
 .admin-middle-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.6fr);
-  gap: 20px; /* slightly smaller gap */
+  gap: 20px;
   margin-bottom: 24px;
 }
 
 .admin-card-gold {
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   border-radius: 18px;
   padding: 18px 22px;
   color: #111827;
@@ -792,7 +784,7 @@
   position: relative;
 }
 
-/* simple "line" chart */
+/* simple line chart */
 
 .admin-line-chart {
   display: flex;
@@ -815,7 +807,7 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
   border: 2px solid #c9a227;
 }
 
@@ -839,7 +831,7 @@
 .admin-bar {
   width: 60%;
   border-radius: 6px 6px 0 0;
-  background: #c9a227; /* muted gold */
+  background: #c9a227;
 }
 
 .admin-chart-xaxis {
@@ -894,8 +886,271 @@
 }
 
 .admin-feedback-rating {
-  color: #c9a227; /* muted gold stars */
+  color: #c9a227;
   font-size: 14px;
+}
+
+/* =========================================================
+   ADMIN COURSE MANAGEMENT (table)
+   ========================================================= */
+
+.course-mgmt-wrapper {
+  margin-top: 12px;
+}
+
+.course-mgmt-table {
+  background: #c9a227;
+  border-radius: 18px;
+  overflow: hidden;
+  color: #111827;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.course-mgmt-header-row,
+.course-mgmt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.6fr) 140px 160px 160px;
+  align-items: center;
+  font-size: 14px;
+  padding: 12px 20px;
+}
+
+.course-mgmt-header-row {
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.course-mgmt-row + .course-mgmt-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.course-mgmt-cell.title {
+  font-weight: 500;
+}
+
+.course-mgmt-cell.updated {
+  font-size: 13px;
+}
+
+.course-mgmt-cell.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.course-mgmt-action {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.course-mgmt-action-icon {
+  font-size: 14px;
+}
+
+.course-mgmt-action.edit {
+  color: #2563eb;
+}
+
+.course-mgmt-action.delete {
+  color: #dc2626;
+}
+
+.course-mgmt-add-btn {
+  margin-top: 18px;
+  border-radius: 999px;
+  border: none;
+  padding: 12px 20px;
+  background: #c9a227;
+  color: #111827;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+}
+
+/* =========================================================
+   ADMIN COURSE FORM (add/edit)
+   ========================================================= */
+
+.course-form-wrapper {
+  max-width: 1040px;
+}
+
+.course-form-card {
+  background: #111827;
+  border-radius: 20px;
+  border: 1px solid #374151;
+  padding: 26px 30px 22px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* outer course sections blocks stay gold with dark text */
+.course-form-section {
+  background: #c9a227;
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  color: #111827;
+}
+
+.course-form-section-heading {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.course-form-input,
+.course-form-select,
+.course-form-textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: none;
+  background: #ffffff;
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+.course-form-textarea {
+  resize: vertical;
+}
+
+.course-form-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.course-form-add-section-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 8px 14px;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Section cards (Section 1, 2, 3...) now dark with white text */
+.course-form-section-card {
+  margin-top: 12px;
+  background: #111827; /* dark */
+  color: #f9fafb;      /* white text */
+  border-radius: 14px;
+  padding: 12px 14px 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.course-form-section-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.course-form-section-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #f9fafb; /* ensure "Section 1" text is white */
+}
+
+.course-form-delete-section-btn {
+  border: none;
+  background: transparent;
+  color: #f97316;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* grid inside each section */
+.course-form-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 140px 180px minmax(0, 1.2fr);
+  gap: 8px 12px;
+  margin-top: 6px;
+  align-items: flex-start;
+}
+
+.course-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* default labels dark (for non-section blocks) */
+.course-form-label {
+  font-size: 12px;
+  color: #111827;
+}
+
+/* override inside dark section card: labels become light */
+.course-form-section-card .course-form-label {
+  color: #e5e7eb;
+}
+
+/* Required text & checkbox row */
+.course-form-required {
+  margin-top: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* make checkbox use muted gold both checked & unchecked */
+.course-form-required input {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 2px solid #c9a227; /* gold border when unchecked */
+  accent-color: #c9a227;      /* gold fill, white check when checked */
+}
+
+/* required text inside section cards should be white */
+.course-form-section-card .course-form-required span {
+  color: #f9fafb;
+}
+
+.course-form-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.course-form-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 9px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.course-form-btn.primary {
+  background: #16a34a;
+  color: #ecfdf3;
+  font-weight: 600;
+}
+
+.course-form-btn.secondary {
+  background: #c9a227;
+  color: #111827;
+}
+
+.course-form-btn.tertiary {
+  background: #4b5563;
+  color: #f9fafb;
 }
 
 /* =========================================================
@@ -930,7 +1185,18 @@
   .profile-card,
   .admin-top-grid,
   .admin-middle-grid,
-  .admin-feedback-row {
+  .admin-feedback-row,
+  .course-form-field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .course-mgmt-header-row,
+  .course-mgmt-row {
+    grid-template-columns: minmax(0, 2fr);
+    row-gap: 4px;
+  }
+
+  .course-mgmt-cell.actions {
+    justify-content: flex-start;
   }
 }
