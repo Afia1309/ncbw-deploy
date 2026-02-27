@@ -97,9 +97,9 @@ export default function MemberDashboard() {
         {/* Overall progress */}
         <section className="dash-card progress-card">
          <div 
-  className="dash-progress-circle" 
-  style={{ '--progress-deg': `${progress.percent_complete * 3.6}deg` }}
->
+            className="dash-progress-circle" 
+             style={{ '--progress-deg': `${progress.percent_complete * 3.6}deg` }}
+             >
             <div className="dash-progress-inner">
               <div className="dash-progress-number">
                 {progress.percent_complete}%
@@ -172,8 +172,8 @@ export default function MemberDashboard() {
                 {module.locked && (
                   <span className="dash-locked-badge">🔒 Locked</span>
                 )}
-                <span className={`dash-status-badge ${module.status}`}>
-                  {module.status.replace('_', ' ')}
+              <span className={`dash-status-badge ${module.status}`}>
+               {module.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </span>
               </div>
               <div className="dash-progress-bar">
