@@ -12,7 +12,21 @@ import re
 from .models import Profile, LoginSecurity
 from training.models import Track, Enrollment
 
+from rest_framework_simplejwt.tokens import RefreshToken
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    try:
+        refresh_token = request.data.get('refresh')
+        if refresh_token:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        
+        return Response({'message': 'Successfully logged out'}, status=200)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+    
 def validate_password_strength(password):
     """Validate password meets requirements"""
     if len(password) < 8:
