@@ -1,12 +1,16 @@
 # This file is in charge of automatically sending an email reminder to trainees who have been inactive for a certain period of time
 # This command DOES NOT modify training progress
-# (!) Currently it only tracks last login, but will be updated to track last time since a module was completed (!)
 
 from django.core.management.base import BaseCommand # base class for creating custom Django management commands
 from django.contrib.auth import get_user_model # retrieve active user model
 from django.core.mail import send_mail # email utility
 from django.utils import timezone # timezone utilites
 from datetime import timedelta # date/time utilites
+from django.conf import settings
+from django.db.models import Max
+
+from notifications.models import Notification
+from training.models import ModuleProgress
 
 User = get_user_model() # get project's user model
 
@@ -22,16 +26,43 @@ class Command(BaseCommand):
             default=7,
             help="Number of days of inactivity before sending reminder email",
         )
+        parser.add_argument(
+            "--minutes",
+            type=int,
+            default=None,
+            help="For testing only: number of minutes of inactivity"
+        )
 
     # Main method
     def handle(self, *args, **options):
         days = options["days"] # Read number of inactive days
-        cutoff_date = timezone.now() - timedelta(days=days) # Calculate cutoff date
+        minutes = options["minutes"] # Read number of inactive minutes
 
+        if minutes is not None:
+            cutoff_date = timezone.now() - timedelta(minutes=minutes)
+        else:
+            cutoff_date = timezone.now() - timedelta(days=days) # Calculate cutoff date
+
+        # Determine last module activity per user
+        user_activity = ModuleProgress.objects.exclude(
+            last_activity__isnull=True
+        ).values("user").annotate(
+            last_activity=Max("last_activity")
+        )
+
+        # Find users whose last activity is older than cutoff
+        inactive_user_ids = [
+            entry["user"]
+            for entry in user_activity
+            if entry["last_activity"] < cutoff_date
+        ]
+
+        # Query for inactive users
         inactive_users = User.objects.filter(
-            # Query for inactive users
-            last_login__lt=cutoff_date,
+            id__in=inactive_user_ids,
             is_active=True,
+            profile__inactivity_reminder_sent_at__isnull=True,
+            profile__role='trainee',    # Additional safety filter (trainees-only)
         )
 
         # No inactive users, exit early
@@ -53,9 +84,23 @@ class Command(BaseCommand):
                     "Please log in to complete your required training.\n\n"
                     "Thank you."
                 ),
-                from_email="training@portal.local",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                #from_email="training@portal.local",
                 recipient_list=[user.email],
                 fail_silently=False,
+            )
+
+            # Mark reminder timestamp
+            user.profile.inactivity_reminder_sent_at = timezone.now()
+            user.profile.save(update_fields=["inactivity_reminder_sent_at"])
+
+            # Send reminder notification in dashboard
+            Notification.objects.create(
+                user=user,
+                title="Inactivity Reminder",
+                message="You have been inactive. Please log in to complete your required training.",
+                notification_type="warning",
+                is_read=False,
             )
 
             # Output confirmation to terminal

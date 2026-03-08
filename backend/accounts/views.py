@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import re
 
 from .models import Profile, LoginSecurity
-from training.models import Track, Enrollment
+from training.models import Track, Enrollment, Module, ModuleProgress
 
 
 def validate_password_strength(password):
@@ -209,6 +209,7 @@ def register(request):
                 LoginSecurity.objects.create(user=user)
             
             # Auto-enroll in Leadership Track
+            #
             track = Track.objects.first()
             if track:
                 Enrollment.objects.create(
@@ -217,6 +218,16 @@ def register(request):
                     cohort='2026',
                     phase='Phase 1'
                 )
+
+                # Create progress records for each module
+                modules = Module.objects.filter(track=track)
+
+                for module in modules:
+                    ModuleProgress.objects.create(
+                        user=user,
+                        module=module,
+                        status="not_started"
+                    )
         
         return Response({
             'message': 'Account created successfully',

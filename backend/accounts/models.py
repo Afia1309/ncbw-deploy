@@ -106,6 +106,8 @@ class Profile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    inactivity_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+
     def save(self, *args, **kwargs):
       
         if not self.member_id:

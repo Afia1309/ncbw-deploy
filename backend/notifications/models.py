@@ -25,7 +25,6 @@ class Notification(models.Model):
 
     is_read = models.BooleanField(default=False) # Has the user seen this notification?
     created_at = models.DateTimeField(default=timezone.now)
-    # created_at = models.DateTimeField(auto_now_add=True)
 
     def mark_read(self):
         self.is_read = True
@@ -33,4 +32,3 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.title}"
-        # return f"{self.user.username} - {self.title}"

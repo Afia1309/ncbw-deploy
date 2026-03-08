@@ -158,10 +158,20 @@ CORS_ALLOWED_ORIGINS = [
 
 
 # --------------------------------------------------
-# Email (DEV only — prints emails to terminal)
+# Email (Currently: SMTP)
+#   (-Decide on email provider for deployment) (!)
+#   (What will change: EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
 # --------------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "no-reply@ncbw-training.local"
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = "ethandbeam2@gmail.com" # (Currently using personal email for testing, remember to change (!) - EB)
+EMAIL_HOST_PASSWORD = "heukfyyupcskxhnc" # (Ditto) (!)
+
+DEFAULT_FROM_EMAIL = "no-reply@ncbw-training.local" # (Overridden by Gmail)
 
 
 # --------------------------------------------------
