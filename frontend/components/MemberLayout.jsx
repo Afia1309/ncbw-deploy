@@ -53,11 +53,25 @@ export default function MemberLayout({ title, children }) {
     return "U";
   };
 
-  const handleSignOut = () => {
+const handleSignOut = async () => {
+  try {
+    const refreshToken = localStorage.getItem('refresh_token');
+    
+    // Call backend to blacklist token
+    if (refreshToken) {
+      await api.post('/auth/logout/', {
+        refresh: refreshToken
+      });
+    }
+  } catch (err) {
+    console.error('Logout error:', err);
+  } finally {
+    // Always clear local storage
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    navigate("/login");
-  };
+    navigate('/login');
+  }
+};
 
   return (
     <div className="dash-page">

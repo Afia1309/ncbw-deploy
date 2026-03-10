@@ -15,6 +15,8 @@ import MemberProfile from "./pages/MemberProfile";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminProfile from "./pages/AdminProfile";
+import AdminCourseManagement from "./pages/AdminCourseManagement";
+import AdminCourseForm from "./pages/AdminCourseForm";
 
 export default function App() {
   return (
@@ -33,6 +35,8 @@ export default function App() {
         <Route path="/member/manage-profile" element={<ManageProfile />} />
         <Route path="/member/modules" element={<Modules />} />
         <Route path="/member/account" element={<Account />} />
+
+        {/* Member courses */}
         <Route path="/member/courses" element={<CourseSelection />} />
         <Route path="/member/course/:id" element={<CourseDisplay />} />
         <Route path="/member/material/:id" element={<CourseMaterial />} />
@@ -40,7 +44,9 @@ export default function App() {
         {/* Admin routes */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/profile" element={<AdminProfile />} />
-        {/* other admin pages (messages, members, etc.) can be added later */}
+        <Route path="/admin/courses" element={<AdminCourseManagement />} />
+        <Route path="/admin/courses/new" element={<AdminCourseForm />} />
+        <Route path="/admin/courses/:id/edit" element={<AdminCourseForm />} />
       </Routes>
     </BrowserRouter>
   );
