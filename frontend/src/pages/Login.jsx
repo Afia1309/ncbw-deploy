@@ -28,10 +28,26 @@ export default function Login() {
       });
 
       // Save Tokens
+      //localStorage.setItem("access_token", response.data.access);
+      //localStorage.setItem("refresh_token", response.data.refresh);
+      // Save Tokens
       localStorage.setItem("access_token", response.data.access);
       localStorage.setItem("refresh_token", response.data.refresh);
 
+      // Save user info
+      if (response.data.user) {
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+      }
+
+      const role = response.data.user?.role;
+
+      if (role === "admin") {
+        navigate("/admin/dashboard");
+      } else if (role === "instructor") {
+        navigate("/instructor/dashboard");
+      } else {
       navigate("/member/dashboard");
+      }
 
     } catch (err) {
       console.error("Login error:", err.response?.data);

@@ -14,6 +14,11 @@ from training.models import Track, Enrollment, Module, ModuleProgress
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout(request):
