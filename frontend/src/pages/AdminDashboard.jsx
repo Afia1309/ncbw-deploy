@@ -1,57 +1,17 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../components/AdminLayout";
 import "./AdminDashboard.css";
 
-export default function AdminDashboard() {
-  const [instructors, setInstructors] = useState([
-    {
-      id: 1,
-      name: "Kofi Mensah",
-      email: "kofi@ncbw.org",
-      courses: "3",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Ama Boateng",
-      email: "ama@ncbw.org",
-      courses: "2",
-      status: "Pending",
-    },
-    {
-      id: 3,
-      name: "Yaw Asante",
-      email: "yaw@ncbw.org",
-      courses: "1",
-      status: "Active",
-    },
-  ]);
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
 
-  const [members, setMembers] = useState([
-    {
-      id: 1,
-      name: "Abena Owusu",
-      email: "abena@email.com",
-      position: "General Member",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Kojo Mensimah",
-      email: "kojo@email.com",
-      position: "Secretary",
-      status: "In Progress",
-    },
-    {
-      id: 3,
-      name: "Efua Nyarko",
-      email: "efua@email.com",
-      position: "Vice President",
-      status: "Active",
-    },
-  ]);
+export default function AdminDashboard() {
+  const [instructors, setInstructors] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showTraineeInviteModal, setShowTraineeInviteModal] = useState(false);
   const [showInstructorsModal, setShowInstructorsModal] = useState(false);
   const [showTraineesModal, setShowTraineesModal] = useState(false);
   const [editingTrainee, setEditingTrainee] = useState(null);
@@ -59,6 +19,10 @@ export default function AdminDashboard() {
   const [inviteForm, setInviteForm] = useState({
     name: "",
     email: "",
+  });
+
+  const [traineeInviteForm, setTraineeInviteForm] = useState({
+    emails: "",
   });
 
   const [instructorSearch, setInstructorSearch] = useState("");
@@ -71,6 +35,48 @@ export default function AdminDashboard() {
     position: "",
     status: "",
   });
+
+  function getAuthHeaders() {
+    const token = localStorage.getItem("access");
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
+  async function fetchDashboardData() {
+    try {
+      setLoading(true);
+
+      const [instructorsRes, traineesRes] = await Promise.all([
+        fetch(`${API_BASE}/admin/instructors/`, {
+          headers: getAuthHeaders(),
+        }),
+        fetch(`${API_BASE}/admin/trainees/`, {
+          headers: getAuthHeaders(),
+        }),
+      ]);
+
+      if (!instructorsRes.ok || !traineesRes.ok) {
+        throw new Error("Failed to load dashboard data.");
+      }
+
+      const instructorsData = await instructorsRes.json();
+      const traineesData = await traineesRes.json();
+
+      setInstructors(instructorsData);
+      setMembers(traineesData);
+    } catch (error) {
+      console.error(error);
+      alert("Unable to load dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const filteredInstructors = useMemo(() => {
     const value = instructorSearch.toLowerCase();
@@ -102,6 +108,15 @@ export default function AdminDashboard() {
     setShowInviteModal(false);
   }
 
+  function openTraineeInviteModal() {
+    setTraineeInviteForm({ emails: "" });
+    setShowTraineeInviteModal(true);
+  }
+
+  function closeTraineeInviteModal() {
+    setShowTraineeInviteModal(false);
+  }
+
   function handleInviteChange(e) {
     const { name, value } = e.target;
     setInviteForm((prev) => ({
@@ -110,28 +125,144 @@ export default function AdminDashboard() {
     }));
   }
 
-  function handleSaveInvite(e) {
-    e.preventDefault();
-
-    if (!inviteForm.name.trim() || !inviteForm.email.trim()) return;
-
-    const newInstructor = {
-      id: Date.now(),
-      name: inviteForm.name,
-      email: inviteForm.email,
-      courses: "0",
-      status: "Pending",
-    };
-
-    setInstructors((prev) => [newInstructor, ...prev]);
-    setShowInviteModal(false);
+  function handleTraineeInviteChange(e) {
+    const { name, value } = e.target;
+    setTraineeInviteForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
-  function handleDeleteInstructor(id) {
-    const confirmed = window.confirm("Are you sure you want to delete this instructor?");
+  async function handleSaveInvite(e) {
+    e.preventDefault();
+
+    if (!inviteForm.name.trim() || !inviteForm.email.trim()) {
+      alert("Please enter the instructor's name and email.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/instructors/invite/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: inviteForm.name,
+          email: inviteForm.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage =
+          data?.email?.[0] ||
+          data?.name?.[0] ||
+          data?.detail ||
+          "Failed to send instructor invite.";
+        throw new Error(errorMessage);
+      }
+
+      setInstructors((prev) => [data.invite, ...prev]);
+      setShowInviteModal(false);
+      setInviteForm({ name: "", email: "" });
+
+      if (!data.email_sent) {
+        alert(
+          "Instructor was created, but email was not sent yet because Postmark is not configured."
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
+  }
+
+  async function handleSaveTraineeInvites(e) {
+    e.preventDefault();
+
+    const emailList = traineeInviteForm.emails
+      .split("\n")
+      .map((email) => email.trim())
+      .filter(Boolean);
+
+    if (emailList.length === 0) {
+      alert("Please enter at least one trainee email address.");
+      return;
+    }
+
+    const successes = [];
+    const failures = [];
+
+    for (const email of emailList) {
+      try {
+        const response = await fetch(`${API_BASE}/admin/trainees/invite/`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            email,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const message =
+            data?.email?.[0] || data?.detail || "Failed to invite trainee.";
+          failures.push(`${email}: ${message}`);
+          continue;
+        }
+
+        successes.push(data.invite);
+      } catch (error) {
+        failures.push(`${email}: ${error.message}`);
+      }
+    }
+
+    if (successes.length > 0) {
+      setMembers((prev) => [...successes, ...prev]);
+    }
+
+    closeTraineeInviteModal();
+    setTraineeInviteForm({ emails: "" });
+
+    if (successes.length > 0 && failures.length === 0) {
+      alert(`Successfully sent ${successes.length} trainee invite(s).`);
+    } else if (successes.length > 0 && failures.length > 0) {
+      alert(
+        `Sent ${successes.length} trainee invite(s).\n\nSome failed:\n${failures.join(
+          "\n"
+        )}`
+      );
+    } else if (failures.length > 0) {
+      alert(`No trainee invites were sent.\n\n${failures.join("\n")}`);
+    }
+  }
+
+  async function handleDeleteInstructor(id) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this instructor?"
+    );
     if (!confirmed) return;
 
-    setInstructors((prev) => prev.filter((instructor) => instructor.id !== id));
+    try {
+      const response = await fetch(`${API_BASE}/admin/instructors/${id}/`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Failed to delete instructor.");
+      }
+
+      setInstructors((prev) =>
+        prev.filter((instructor) => instructor.id !== id)
+      );
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   }
 
   function openTraineeEditModal(member) {
@@ -164,29 +295,89 @@ export default function AdminDashboard() {
     }));
   }
 
-  function handleSaveTraineeEdit(e) {
+  async function handleSaveTraineeEdit(e) {
     e.preventDefault();
 
-    setMembers((prev) =>
-      prev.map((member) =>
-        member.id === editTraineeForm.id
-          ? {
-              ...member,
-              position: editTraineeForm.position,
-              status: editTraineeForm.status,
-            }
-          : member
-      )
-    );
+    try {
+      const statusMap = {
+        Active: "active",
+        "In Progress": "in_progress",
+        Inactive: "inactive",
+        Pending: "pending",
+      };
 
-    closeTraineeEditModal();
+      const response = await fetch(
+        `${API_BASE}/admin/trainees/${editTraineeForm.id}/`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            position: editTraineeForm.position,
+            status: statusMap[editTraineeForm.status] || "active",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Failed to update trainee.");
+      }
+
+      setMembers((prev) =>
+        prev.map((member) =>
+          member.id === editTraineeForm.id ? data.trainee : member
+        )
+      );
+
+      closeTraineeEditModal();
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   }
 
-  function handleDeleteTrainee(id) {
-    const confirmed = window.confirm("Are you sure you want to delete this trainee?");
+  async function handleDeleteTrainee(id) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this trainee?"
+    );
     if (!confirmed) return;
 
-    setMembers((prev) => prev.filter((member) => member.id !== id));
+    try {
+      const response = await fetch(`${API_BASE}/admin/trainees/${id}/`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Failed to delete trainee.");
+      }
+
+      setMembers((prev) => prev.filter((member) => member.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
+  }
+
+  const pendingInvitesCount =
+    instructors.filter((i) => i.status === "Pending").length +
+    members.filter((m) => m.status === "Pending").length;
+
+  const activeTraineesCount = members.filter(
+    (m) => m.status === "Active"
+  ).length;
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="admin-dashboard">
+          <p>Loading dashboard...</p>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (
@@ -195,7 +386,7 @@ export default function AdminDashboard() {
         <div className="admin-cards">
           <div className="admin-card">
             <h3>Active Trainees</h3>
-            <div className="card-number">128</div>
+            <div className="card-number">{activeTraineesCount}</div>
           </div>
 
           <div className="admin-card">
@@ -205,14 +396,12 @@ export default function AdminDashboard() {
 
           <div className="admin-card">
             <h3>Published Courses</h3>
-            <div className="card-number">45</div>
+            <div className="card-number">0</div>
           </div>
 
           <div className="admin-card warning">
             <h3>Pending Invites</h3>
-            <div className="card-number">
-              {instructors.filter((i) => i.status === "Pending").length}
-            </div>
+            <div className="card-number">{pendingInvitesCount}</div>
           </div>
         </div>
 
@@ -247,24 +436,32 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {instructors.map((instructor) => (
-                  <tr key={instructor.id}>
-                    <td>{instructor.name}</td>
-                    <td>{instructor.email}</td>
-                    <td>{instructor.courses}</td>
-                    <td>
-                      <span
-                        className={`status-badge ${
-                          instructor.status === "Active"
-                            ? "status-active"
-                            : "status-pending"
-                        }`}
-                      >
-                        {instructor.status}
-                      </span>
+                {instructors.length > 0 ? (
+                  instructors.map((instructor) => (
+                    <tr key={instructor.id}>
+                      <td>{instructor.name}</td>
+                      <td>{instructor.email}</td>
+                      <td>{instructor.courses}</td>
+                      <td>
+                        <span
+                          className={`status-badge ${
+                            instructor.status === "Active"
+                              ? "status-active"
+                              : "status-pending"
+                          }`}
+                        >
+                          {instructor.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="empty-state">
+                      No instructors yet.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -280,11 +477,16 @@ export default function AdminDashboard() {
             <div className="panel-actions">
               <button
                 className="panel-btn primary"
+                onClick={openTraineeInviteModal}
+              >
+                Invite Trainees
+              </button>
+              <button
+                className="panel-btn secondary"
                 onClick={() => setShowTraineesModal(true)}
               >
                 View Trainees
               </button>
-              <button className="panel-btn secondary">Export</button>
             </div>
           </div>
 
@@ -299,24 +501,34 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {members.map((member) => (
-                  <tr key={member.id}>
-                    <td>{member.name}</td>
-                    <td>{member.email}</td>
-                    <td>{member.position}</td>
-                    <td>
-                      <span
-                        className={`status-badge ${
-                          member.status === "Active"
-                            ? "status-active"
-                            : "status-progress"
-                        }`}
-                      >
-                        {member.status}
-                      </span>
+                {members.length > 0 ? (
+                  members.map((member) => (
+                    <tr key={member.id}>
+                      <td>{member.name}</td>
+                      <td>{member.email}</td>
+                      <td>{member.position}</td>
+                      <td>
+                        <span
+                          className={`status-badge ${
+                            member.status === "Active"
+                              ? "status-active"
+                              : member.status === "Pending"
+                              ? "status-pending"
+                              : "status-progress"
+                          }`}
+                        >
+                          {member.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="empty-state">
+                      No trainees yet.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -363,6 +575,52 @@ export default function AdminDashboard() {
                   </button>
                   <button type="submit" className="modal-btn primary">
                     Send Invite
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showTraineeInviteModal && (
+          <div className="modal-overlay">
+            <div className="modal-card">
+              <h2>Invite Trainees</h2>
+              <p className="modal-subtext">
+                Enter one or more trainee email addresses, one per line.
+              </p>
+
+              <form onSubmit={handleSaveTraineeInvites} className="dashboard-form">
+                <div className="form-group">
+                  <label>Email Addresses</label>
+                  <textarea
+                    name="emails"
+                    value={traineeInviteForm.emails}
+                    onChange={handleTraineeInviteChange}
+                    placeholder={`example1@email.com\nexample2@email.com\nexample3@email.com`}
+                    rows={7}
+                    style={{
+                      width: "100%",
+                      borderRadius: "14px",
+                      padding: "14px 16px",
+                      background: "#032142",
+                      color: "#fff",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="modal-btn secondary"
+                    onClick={closeTraineeInviteModal}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="modal-btn primary">
+                    Send Invites
                   </button>
                 </div>
               </form>
@@ -497,6 +755,8 @@ export default function AdminDashboard() {
                             className={`status-badge ${
                               member.status === "Active"
                                 ? "status-active"
+                                : member.status === "Pending"
+                                ? "status-pending"
                                 : "status-progress"
                             }`}
                           >
@@ -579,8 +839,10 @@ export default function AdminDashboard() {
                     value={editTraineeForm.status}
                     onChange={handleEditTraineeChange}
                   >
+                    <option value="Pending">Pending</option>
                     <option value="Active">Active</option>
                     <option value="In Progress">In Progress</option>
+                    <option value="Inactive">Inactive</option>
                   </select>
                 </div>
 

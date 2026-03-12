@@ -6,6 +6,7 @@ import bgImage from "../assets/login-bg.jpg";
 
 export default function Login() {
   const navigate = useNavigate();
+
   const [memberId, setMemberId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -21,41 +22,38 @@ export default function Login() {
     setLoading(true);
 
     try {
-
       const response = await api.post("/token/", {
-          username: memberId,
-          password: password,
+        username: memberId,
+        password: password,
       });
 
-      // Save Tokens
-      //localStorage.setItem("access_token", response.data.access);
-      //localStorage.setItem("refresh_token", response.data.refresh);
-      // Save Tokens
-      localStorage.setItem("access_token", response.data.access);
-      localStorage.setItem("refresh_token", response.data.refresh);
+      const data = response.data;
 
-      // Save user info
-      if (response.data.user) {
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+
+      localStorage.setItem("access_token", data.access);
+      localStorage.setItem("refresh_token", data.refresh);
+
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
       }
 
-      const role = response.data.user?.role;
+      const role = data.user?.role;
 
       if (role === "admin") {
         navigate("/admin/dashboard");
       } else if (role === "instructor") {
         navigate("/instructor/dashboard");
       } else {
-      navigate("/member/dashboard");
+        navigate("/member/dashboard");
       }
-
     } catch (err) {
       console.error("Login error:", err.response?.data);
 
       if (err.response && err.response.data) {
         const data = err.response.data;
-        
-        // Handle error response
+
         if (data.detail) {
           setError(data.detail);
         } else if (data.non_field_errors) {
@@ -72,8 +70,7 @@ export default function Login() {
   }
 
   const isLocked =
-    typeof error === "string" &&
-    error.toLowerCase().includes("locked");
+    typeof error === "string" && error.toLowerCase().includes("locked");
 
   return (
     <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
