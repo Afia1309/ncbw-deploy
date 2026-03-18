@@ -58,25 +58,7 @@ def dashboard(request):
 
     enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
     if not enrollment:
-        return Response({
-            "user": {
-                "name": u.get_full_name() or u.username,
-                "member_id": str(member_id),
-                "role": role,
-            },
-            "program": {
-                "track": None,
-                "phase": None,
-                "cohort": None,
-            },
-            "progress": {
-                "percent_complete": 0,
-                "completed_required": 0,
-                "total_required": 0,
-            },
-            "required_modules": [],
-        })
-        # (Temporary fix while track stuff is figured out) (!)
+        return Response({"detail": "User is not enrolled in a track."}, status=400)
 
     track = enrollment.track
 
@@ -161,6 +143,8 @@ def update_module_status(request, module_id):
 
     if status == "completed":
         obj.completed_at = timezone.now()
+    else:
+        obj.completed_at = None
 
     obj.save()
     return Response({"ok": True})

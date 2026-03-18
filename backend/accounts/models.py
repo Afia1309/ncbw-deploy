@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class LoginSecurity(models.Model):
@@ -19,46 +21,38 @@ class LoginSecurity(models.Model):
     locked_until = models.DateTimeField(null=True, blank=True)
 
     def register_failure(self):
-        """Increment failed attempts and lock account after 5 tries."""
         now = timezone.now()
 
-   
         if self.locked_until and self.locked_until > now:
             return
 
         self.failed_attempts += 1
 
-        # Lock user for 10 minutes after 5 failed attempts
         if self.failed_attempts >= 5:
             self.locked_until = now + timedelta(minutes=10)
-            self.failed_attempts = 0  # reset counter after lockout
+            self.failed_attempts = 0
 
         self.save()
 
     def reset(self):
-        """Reset failure count and clear lockout after successful login."""
         self.failed_attempts = 0
         self.locked_until = None
         self.save()
 
     def is_locked(self):
-        """Check whether the account is currently locked."""
         return self.locked_until and self.locked_until > timezone.now()
 
     def __str__(self):
         return f"LoginSecurity({self.user.username})"
 
 
-
 class Profile(models.Model):
-    """Extended user profile for member ID, role, position, etc."""
-    
     ROLE_CHOICES = [
         ('trainee', 'Trainee'),
         ('instructor', 'Instructor'),
         ('admin', 'Administrator'),
     ]
-    
+
     POSITION_CHOICES = [
         ('President', 'President'),
         ('Vice President', 'Vice President'),
@@ -68,79 +62,125 @@ class Profile(models.Model):
         ('Parliamentarian', 'Parliamentarian'),
         ('General Member', 'General Member'),
     ]
-    
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('active', 'Active'),
+        ('in_progress', 'In Progress'),
+        ('inactive', 'Inactive'),
+        ('deleted', 'Deleted'),
+    ]
+
     user = models.OneToOneField(
-        User, 
+        User,
         on_delete=models.CASCADE,
         related_name='profile'
     )
+
     member_id = models.CharField(
-        max_length=50, 
+        max_length=20,
         unique=True,
         null=True,
         blank=True,
-        help_text="Unique member identifier"
+        help_text="Unique login/member identifier, e.g. N12345678"
     )
+
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
         default='trainee'
     )
+
     position = models.CharField(
         max_length=50,
         choices=POSITION_CHOICES,
         blank=True,
         default='General Member'
     )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+
     phone = models.CharField(
-        max_length=20, 
+        max_length=20,
         blank=True,
         default=''
     )
+
     department = models.CharField(
-        max_length=100, 
+        max_length=100,
         blank=True,
         default=''
     )
-    
+
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invited_users'
+    )
+
+    invited_at = models.DateTimeField(null=True, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    inactivity_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-      
-        if not self.member_id:
-            self.member_id = f"MEM{self.user.id:04d}"
+        if self.user and self.user.username and not self.member_id:
+            self.member_id = self.user.username
         super().save(*args, **kwargs)
 
+    def soft_delete(self):
+        self.status = 'deleted'
+        self.deleted_at = timezone.now()
+        self.user.is_active = False
+        self.user.save(update_fields=['is_active'])
+        self.save(update_fields=['status', 'deleted_at'])
+
+    def activate_account(self):
+        self.status = 'active'
+        self.activated_at = timezone.now()
+        self.user.is_active = True
+        self.user.save(update_fields=['is_active'])
+        self.save(update_fields=['status', 'activated_at'])
+
     def __str__(self):
-        return f"{self.user.username} - {self.member_id or 'No ID'}"
-
-
-
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+        return f"{self.user.username} - {self.role} - {self.status}"
 
 
 @receiver(post_save, sender=User)
 def create_user_related(sender, instance, created, **kwargs):
-    """
-    Automatically create LoginSecurity and Profile when a User is created.
-    """
     if created:
         LoginSecurity.objects.create(user=instance)
-        Profile.objects.create(user=instance)
+        Profile.objects.create(
+            user=instance,
+            member_id=instance.username or None
+        )
     else:
-        # Ensure profile exists even for existing users
         if not hasattr(instance, 'profile'):
-            Profile.objects.create(user=instance)
+            Profile.objects.create(
+                user=instance,
+                member_id=instance.username or None
+            )
         if not hasattr(instance, 'login_security'):
             LoginSecurity.objects.create(user=instance)
 
 
 @receiver(post_save, sender=User)
 def save_user_related(sender, instance, **kwargs):
-    """Save related models when User is saved."""
     if hasattr(instance, 'profile'):
-        instance.profile.save()
+        profile = instance.profile
+        if instance.username and profile.member_id != instance.username:
+            profile.member_id = instance.username
+        profile.save()
+
     if hasattr(instance, 'login_security'):
         instance.login_security.save()

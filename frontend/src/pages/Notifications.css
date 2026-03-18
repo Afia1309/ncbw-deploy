@@ -1,14 +1,8 @@
-/* ===================
-   Notifications Page
-   =================== */
-
 .notifications-card {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
-
-/* Header */
 
 .notifications-header {
   display: flex;
@@ -18,110 +12,108 @@
 
 .notifications-count {
   font-size: 13px;
-  padding: 6px 12px;
+  font-weight: 700;
+  padding: 8px 14px;
   border-radius: 999px;
-  background: #1f2937;
-  color: #c9a227;
-  border: 1px solid #374151;
+  background: rgba(201, 162, 39, 0.12);
+  color: #f5d76e;
+  border: 1px solid rgba(201, 162, 39, 0.28);
 }
-
-/* Empty state */
 
 .notifications-empty {
-  font-size: 14px;
-  color: #9ca3af;
+  min-height: 92px;
 }
-
-/* List */
 
 .notifications-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
-
-/* Individual item */
 
 .notification-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 24px;
-
-  padding: 16px 18px;
-  border-radius: 14px;
-  border: 1px solid #374151;
-  background: #030712;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid #334155;
+  background: #111a2b;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
 .notification-item:hover {
-  background: #111827;
   transform: translateY(-2px);
+  border-color: #475569;
+  background: #162134;
 }
-
-/* Left side of Notification (Title/Message) */
-
-.notification-left {
-  flex: 1;
-}
-
-/* Right side of Notification (Time/Mark as Read button) */
-
-.notification-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  min-width: 140px;
-}
-
-/* Unread indicator */
 
 .notification-item.unread {
   border-left: 4px solid #c9a227;
 }
 
-/* Read styling */
-
 .notification-item.read {
-  opacity: 0.50;
+  opacity: 0.72;
 }
 
-/* Text */
+.notification-left {
+  flex: 1;
+}
+
+.notification-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 160px;
+}
 
 .notification-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #f8fafc;
 }
 
 .notification-message {
-  font-size: 13px;
-  color: #d1d5db;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
 }
-
-/* Button */
 
 .notification-btn {
   border-radius: 999px;
-  border: none;
-  padding: 8px 16px;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  padding: 10px 16px;
   background: #c9a227;
-  color: #111827;
-  font-size: 12px;
-  font-weight: 600;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 0.15s ease;
+  transition: transform 0.18s ease, filter 0.18s ease;
 }
 
 .notification-btn:hover {
-  opacity: 0.9;
+  transform: translateY(-1px);
+  filter: brightness(1.03);
 }
 
-/* Time */
 .notification-time {
-  font-size: 13px;
-  color: #9ca3af;
+  font-size: 12px;
+  color: #94a3b8;
   white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .notification-item {
+    flex-direction: column;
+  }
+
+  .notification-right {
+    min-width: 0;
+    width: 100%;
+    align-items: flex-start;
+  }
 }

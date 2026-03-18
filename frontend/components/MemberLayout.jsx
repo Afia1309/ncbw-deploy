@@ -1,27 +1,45 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchUnreadCount } from "../src/api/notifications";
-import api from "../src/api/apiClient";  
+import api from "../src/api/apiClient";
 import "../src/pages/Dashboard.css";
 
 export default function MemberLayout({ title, children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [userName, setUserName] = useState("");
+  const [unread, setUnread] = useState(0);
+  const token = localStorage.getItem("access_token");
 
-  const [unread, setUnread] = useState(0); // Unread notification counter state
-  const token = localStorage.getItem("access_token"); // Authentication token from login
-
-  // Fetch unread count when layout loads
   useEffect(() => {
     if (!token) return;
 
-    fetchUnreadCount(token).then((data) => {
-      if (data?.unread !== undefined) {
-        setUnread(data.unread);
-      }
-    });
+    fetchUnreadCount(token)
+      .then((data) => {
+        if (data?.unread !== undefined) {
+          setUnread(data.unread);
+        }
+      })
+      .catch((err) => {
+        console.error("Unread count fetch failed:", err);
+      });
   }, [token]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      if (!accessToken) return;
+
+      const response = await api.get("/training/me/");
+      setUserName(response.data?.name || "");
+    } catch (err) {
+      console.error("Failed to fetch user:", err);
+    }
+  };
 
   const navItems = [
     { label: "Dashboard", path: "/member/dashboard" },
@@ -30,72 +48,53 @@ export default function MemberLayout({ title, children }) {
     { label: "Messages", path: "/member/notifications" },
   ];
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
-
-  const fetchUserData = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-      
-      const response = await api.get("/training/me/");
-      setUserName(response.data.name);
-    } catch (err) {
-      console.error("Failed to fetch user:", err);
-    }
-  };
-
   const getInitial = () => {
-    if (userName) {
-      return userName.charAt(0).toUpperCase();
-    }
+    if (userName?.trim()) return userName.trim().charAt(0).toUpperCase();
     return "U";
   };
 
-const handleSignOut = async () => {
-  try {
-    const refreshToken = localStorage.getItem('refresh_token');
-    
-    // Call backend to blacklist token
-    if (refreshToken) {
-      await api.post('/auth/logout/', {
-        refresh: refreshToken
-      });
+  const handleSignOut = async () => {
+    try {
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      if (refreshToken) {
+        await api.post("/auth/logout/", {
+          refresh: refreshToken,
+        });
+      }
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      navigate("/login");
     }
-  } catch (err) {
-    console.error('Logout error:', err);
-  } finally {
-    // Always clear local storage
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    navigate('/login');
-  }
-};
+  };
 
   return (
     <div className="dash-page">
-      {/* Sidebar */}
       <aside className="dash-sidebar">
         <div className="dash-logo">NCBW</div>
 
         <nav className="dash-nav">
-          {navItems.map((item) => (
-            <button
-              key={item.path}
-              type="button"
-              className={
-                "dash-sidebar-link" +
-                (location.pathname.startsWith(item.path) ? " active" : "")
-              }
-              onClick={() => navigate(item.path)}
-            >
-              {item.label}
-              {item.label === "Messages" && unread > 0 && (
-                <span className="notif-badge">({unread})</span>
-              )}
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location.pathname.startsWith(item.path);
+
+            return (
+              <button
+                key={item.path}
+                type="button"
+                className={`dash-sidebar-link${isActive ? " active" : ""}`}
+                onClick={() => navigate(item.path)}
+              >
+                <span>{item.label}</span>
+
+                {item.label === "Messages" && unread > 0 && (
+                  <span className="notif-badge">{unread}</span>
+                )}
+              </button>
+            );
+          })}
 
           <button
             type="button"
@@ -107,17 +106,16 @@ const handleSignOut = async () => {
         </nav>
       </aside>
 
-      {/* Main content */}
       <main className="dash-main">
         <header className="dash-header">
           <div className="dash-header-left">
-            <div className="dash-avatar">
-              {getInitial()}
-            </div>
+            <div className="dash-avatar">{getInitial()}</div>
+
             <div className="dash-header-text">
               <div className="dash-header-title">{title}</div>
             </div>
           </div>
+
           <div className="dash-header-brand">NCBW</div>
         </header>
 
