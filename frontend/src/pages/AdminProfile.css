@@ -1,9 +1,9 @@
 .admin-profile-page {
   padding: 32px 40px 40px;
   margin-left: 12px;
-  background: #081b33;
+  background: #ffffff;
   min-height: 100vh;
-  color: #ffffff;
+  color: #111827;
 }
 
 .admin-profile-header {
@@ -30,19 +30,19 @@
   margin: 0 0 6px;
   font-size: 28px;
   font-weight: 700;
-  color: #f8fafc;
+  color: #0f2a44;
 }
 
 .admin-profile-header p {
   margin: 0 0 10px;
   font-size: 15px;
-  color: #cbd5e1;
+  color: #6b7280;
 }
 
 .role-badge {
   display: inline-block;
-  background: rgba(201, 162, 39, 0.16);
-  color: #e7c34d;
+  background: rgba(201, 162, 39, 0.14);
+  color: #9a7b12;
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 13px;
@@ -51,29 +51,30 @@
 
 .admin-profile-grid {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1fr;
   gap: 24px;
   margin-bottom: 24px;
 }
 
 .profile-panel {
-  background: #1f2d44;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 24px;
   padding: 24px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
 .profile-panel h2 {
   margin: 0 0 18px;
   font-size: 22px;
   font-weight: 700;
-  color: #f8fafc;
+  color: #0f2a44;
 }
 
 .panel-subtext {
   margin: -6px 0 18px;
   font-size: 14px;
-  color: #cbd5e1;
+  color: #6b7280;
 }
 
 .info-list {
@@ -87,18 +88,18 @@
   justify-content: space-between;
   gap: 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .info-label {
   font-size: 14px;
-  color: #cbd5e1;
+  color: #6b7280;
 }
 
 .info-value {
   font-size: 14px;
   font-weight: 600;
-  color: #f8fafc;
+  color: #111827;
   text-align: right;
 }
 
@@ -109,7 +110,8 @@
 }
 
 .overview-card {
-  background: #253552;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 18px;
   padding: 20px;
   display: flex;
@@ -130,7 +132,7 @@
 
 .overview-label {
   font-size: 14px;
-  color: #dbe3ee;
+  color: #4b5563;
 }
 
 .profile-actions {
@@ -154,9 +156,13 @@
 }
 
 .profile-btn.secondary {
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #ffffff;
+  color: #0f2a44;
+  border: 1px solid #d1d5db;
+}
+
+.profile-btn.secondary:hover {
+  background: #f9fafb;
 }
 
 @media (max-width: 900px) {
@@ -165,10 +171,11 @@
   }
 }
 
+/* ===== MODALS ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.72);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -179,21 +186,23 @@
 .modal-card {
   width: 100%;
   max-width: 620px;
-  background: #1f2d44;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 24px;
   padding: 28px;
-  color: #ffffff;
+  color: #111827;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
 }
 
 .modal-card h2 {
   margin: 0 0 8px;
   font-size: 24px;
+  color: #0f2a44;
 }
 
 .modal-subtext {
   margin: 0 0 22px;
-  color: #cbd5e1;
+  color: #6b7280;
   font-size: 14px;
 }
 
@@ -212,19 +221,31 @@
 .form-group label {
   font-size: 14px;
   font-weight: 600;
-  color: #f8fafc;
+  color: #374151;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
-  background: #081b33;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
   border-radius: 14px;
   padding: 12px 14px;
   font-size: 14px;
   outline: none;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #9ca3af;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #c9a227;
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.14);
 }
 
 .form-row {
@@ -255,7 +276,11 @@
 }
 
 .modal-btn.secondary {
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #ffffff;
+  color: #0f2a44;
+  border: 1px solid #d1d5db;
+}
+
+.modal-btn.secondary:hover {
+  background: #f9fafb;
 }

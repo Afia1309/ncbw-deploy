@@ -88,3 +88,38 @@ def build_invite_email_text(name, member_id, role, activation_url):
         f"Activate your account here:\n{activation_url}\n\n"
         f"Use your Member ID and email address to activate your account."
     )
+
+
+def build_course_assignment_email_html(instructor_name, course_name, description, open_date, status):
+    display_name = instructor_name or "there"
+
+    return f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #222;">
+        <h2>You have been assigned a new course</h2>
+        <p>Hello {display_name},</p>
+        <p>You have been assigned a new course in the NCBW Training Portal.</p>
+
+        <p><strong>Course:</strong> {course_name}</p>
+        <p><strong>Description:</strong> {description}</p>
+        <p><strong>Open Date:</strong> {open_date}</p>
+        <p><strong>Status:</strong> {status}</p>
+
+        <p>Please log in to the portal to review the course details.</p>
+      </body>
+    </html>
+    """
+
+
+def build_course_assignment_email_text(instructor_name, course_name, description, open_date, status):
+    display_name = instructor_name or "there"
+
+    return (
+        f"Hello {display_name},\n\n"
+        f"You have been assigned a new course in the NCBW Training Portal.\n\n"
+        f"Course: {course_name}\n"
+        f"Description: {description}\n"
+        f"Open Date: {open_date}\n"
+        f"Status: {status}\n\n"
+        f"Please log in to the portal to review the course details."
+    )

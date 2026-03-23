@@ -8,6 +8,12 @@ const API_BASE =
 export default function AdminDashboard() {
   const [instructors, setInstructors] = useState([]);
   const [members, setMembers] = useState([]);
+  const [dashboardSummary, setDashboardSummary] = useState({
+    active_trainees: 0,
+    instructors_count: 0,
+    published_courses_count: 0,
+    pending_invites_count: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -48,24 +54,29 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
 
-      const [instructorsRes, traineesRes] = await Promise.all([
+      const [instructorsRes, traineesRes, summaryRes] = await Promise.all([
         fetch(`${API_BASE}/admin/instructors/`, {
           headers: getAuthHeaders(),
         }),
         fetch(`${API_BASE}/admin/trainees/`, {
           headers: getAuthHeaders(),
         }),
+        fetch(`${API_BASE}/admin/dashboard-summary/`, {
+          headers: getAuthHeaders(),
+        }),
       ]);
 
-      if (!instructorsRes.ok || !traineesRes.ok) {
+      if (!instructorsRes.ok || !traineesRes.ok || !summaryRes.ok) {
         throw new Error("Failed to load dashboard data.");
       }
 
       const instructorsData = await instructorsRes.json();
       const traineesData = await traineesRes.json();
+      const summaryData = await summaryRes.json();
 
       setInstructors(instructorsData);
       setMembers(traineesData);
+      setDashboardSummary(summaryData);
     } catch (error) {
       console.error(error);
       alert("Unable to load dashboard data.");
@@ -163,6 +174,11 @@ export default function AdminDashboard() {
       }
 
       setInstructors((prev) => [data.invite, ...prev]);
+      setDashboardSummary((prev) => ({
+        ...prev,
+        instructors_count: prev.instructors_count + 1,
+        pending_invites_count: prev.pending_invites_count + 1,
+      }));
       setShowInviteModal(false);
       setInviteForm({ name: "", email: "" });
 
@@ -220,6 +236,10 @@ export default function AdminDashboard() {
 
     if (successes.length > 0) {
       setMembers((prev) => [...successes, ...prev]);
+      setDashboardSummary((prev) => ({
+        ...prev,
+        pending_invites_count: prev.pending_invites_count + successes.length,
+      }));
     }
 
     closeTraineeInviteModal();
@@ -256,9 +276,20 @@ export default function AdminDashboard() {
         throw new Error(data?.detail || "Failed to delete instructor.");
       }
 
+      const deletedInstructor = instructors.find((instructor) => instructor.id === id);
+
       setInstructors((prev) =>
         prev.filter((instructor) => instructor.id !== id)
       );
+
+      setDashboardSummary((prev) => ({
+        ...prev,
+        instructors_count: Math.max(prev.instructors_count - 1, 0),
+        pending_invites_count:
+          deletedInstructor?.status === "Pending"
+            ? Math.max(prev.pending_invites_count - 1, 0)
+            : prev.pending_invites_count,
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -331,6 +362,7 @@ export default function AdminDashboard() {
       );
 
       closeTraineeEditModal();
+      fetchDashboardData();
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -355,20 +387,26 @@ export default function AdminDashboard() {
         throw new Error(data?.detail || "Failed to delete trainee.");
       }
 
+      const deletedMember = members.find((member) => member.id === id);
+
       setMembers((prev) => prev.filter((member) => member.id !== id));
+
+      setDashboardSummary((prev) => ({
+        ...prev,
+        active_trainees:
+          deletedMember?.status === "Active"
+            ? Math.max(prev.active_trainees - 1, 0)
+            : prev.active_trainees,
+        pending_invites_count:
+          deletedMember?.status === "Pending"
+            ? Math.max(prev.pending_invites_count - 1, 0)
+            : prev.pending_invites_count,
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message);
     }
   }
-
-  const pendingInvitesCount =
-    instructors.filter((i) => i.status === "Pending").length +
-    members.filter((m) => m.status === "Pending").length;
-
-  const activeTraineesCount = members.filter(
-    (m) => m.status === "Active"
-  ).length;
 
   if (loading) {
     return (
@@ -386,22 +424,26 @@ export default function AdminDashboard() {
         <div className="admin-cards">
           <div className="admin-card">
             <h3>Active Trainees</h3>
-            <div className="card-number">{activeTraineesCount}</div>
+            <div className="card-number">{dashboardSummary.active_trainees}</div>
           </div>
 
           <div className="admin-card">
             <h3>Instructors</h3>
-            <div className="card-number">{instructors.length}</div>
+            <div className="card-number">{dashboardSummary.instructors_count}</div>
           </div>
 
           <div className="admin-card">
             <h3>Published Courses</h3>
-            <div className="card-number">0</div>
+            <div className="card-number">
+              {dashboardSummary.published_courses_count}
+            </div>
           </div>
 
           <div className="admin-card warning">
             <h3>Pending Invites</h3>
-            <div className="card-number">{pendingInvitesCount}</div>
+            <div className="card-number">
+              {dashboardSummary.pending_invites_count}
+            </div>
           </div>
         </div>
 
@@ -479,13 +521,13 @@ export default function AdminDashboard() {
                 className="panel-btn primary"
                 onClick={openTraineeInviteModal}
               >
-                Invite Trainees
+                Send Invite
               </button>
               <button
                 className="panel-btn secondary"
                 onClick={() => setShowTraineesModal(true)}
               >
-                View Trainees
+                View All
               </button>
             </div>
           </div>
@@ -590,7 +632,10 @@ export default function AdminDashboard() {
                 Enter one or more trainee email addresses, one per line.
               </p>
 
-              <form onSubmit={handleSaveTraineeInvites} className="dashboard-form">
+              <form
+                onSubmit={handleSaveTraineeInvites}
+                className="dashboard-form"
+              >
                 <div className="form-group">
                   <label>Email Addresses</label>
                   <textarea
@@ -603,9 +648,9 @@ export default function AdminDashboard() {
                       width: "100%",
                       borderRadius: "14px",
                       padding: "14px 16px",
-                      background: "#032142",
-                      color: "#fff",
-                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "#ffffff",
+                      color: "#111827",
+                      border: "1px solid #d1d5db",
                       resize: "vertical",
                     }}
                   />

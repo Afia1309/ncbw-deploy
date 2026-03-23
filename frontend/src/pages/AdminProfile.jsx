@@ -1,30 +1,29 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import AdminLayout from "../components/AdminLayout";
+import api from "../api/apiClient";
 import "./AdminProfile.css";
 
 export default function AdminProfile() {
   const [adminProfile, setAdminProfile] = useState({
-    orgName: "NCBW Training Administration",
-    email: "training@ncbw.org",
-    role: "System Administrator",
-    department: "Training & Development",
-    phone: "(980) 555-0128",
-    location: "Charlotte, NC",
-    accountType: "Shared Organization Account",
-    created: "Jan 12, 2026",
+    displayName: "",
+    email: "",
+    role: "",
+    department: "",
+    phone: "",
+    memberId: "",
+    created: "",
   });
 
-  const overview = {
-    coursesManaged: 6,
-    instructors: 4,
-    trainees: 128,
-    pendingInvites: 3,
-  };
-
+  const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-  const [editForm, setEditForm] = useState({ ...adminProfile });
+  const [editForm, setEditForm] = useState({
+    displayName: "",
+    email: "",
+    department: "",
+    phone: "",
+  });
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -32,8 +31,59 @@ export default function AdminProfile() {
     confirmPassword: "",
   });
 
+  useEffect(() => {
+    fetchAdminProfile();
+  }, []);
+
+  async function fetchAdminProfile() {
+    try {
+      setLoading(true);
+      const response = await api.get("/auth/admin/profile/");
+      const user = response.data.user;
+
+      const formattedProfile = {
+        displayName: user.name || "",
+        email: user.email || "",
+        role: formatRole(user.role),
+        department: user.department || "",
+        phone: user.phone || "",
+        memberId: user.member_id || "",
+        created: user.created
+          ? new Date(user.created).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : "",
+      };
+
+      setAdminProfile(formattedProfile);
+      setEditForm({
+        displayName: formattedProfile.displayName,
+        email: formattedProfile.email,
+        department: formattedProfile.department,
+        phone: formattedProfile.phone,
+      });
+    } catch (err) {
+      console.error("Failed to load admin profile:", err);
+      alert("Unable to load admin profile.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function formatRole(role) {
+    if (!role) return "";
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  }
+
   function openEditModal() {
-    setEditForm({ ...adminProfile });
+    setEditForm({
+      displayName: adminProfile.displayName,
+      email: adminProfile.email,
+      department: adminProfile.department,
+      phone: adminProfile.phone,
+    });
     setShowEditModal(true);
   }
 
@@ -70,13 +120,50 @@ export default function AdminProfile() {
     }));
   }
 
-  function handleSaveAccountInfo(e) {
+  async function handleSaveAccountInfo(e) {
     e.preventDefault();
-    setAdminProfile({ ...editForm });
-    setShowEditModal(false);
+
+    try {
+      const response = await api.patch("/auth/admin/profile/", {
+        name: editForm.displayName,
+        email: editForm.email,
+        department: editForm.department,
+        phone: editForm.phone,
+      });
+
+      const user = response.data.user;
+
+      setAdminProfile((prev) => ({
+        ...prev,
+        displayName: user.name || prev.displayName,
+        email: user.email || prev.email,
+        department: user.department || "",
+        phone: user.phone || "",
+        role: formatRole(user.role) || prev.role,
+        memberId: user.member_id || prev.memberId,
+        created: user.created
+          ? new Date(user.created).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : prev.created,
+      }));
+
+      setShowEditModal(false);
+      alert("Account information updated successfully.");
+    } catch (err) {
+      console.error(err);
+      const data = err.response?.data;
+      if (data?.email?.[0]) {
+        alert(data.email[0]);
+      } else {
+        alert(data?.detail || "Failed to update account info.");
+      }
+    }
   }
 
-  function handleSavePassword(e) {
+  async function handleSavePassword(e) {
     e.preventDefault();
 
     if (
@@ -84,6 +171,7 @@ export default function AdminProfile() {
       !passwordForm.newPassword ||
       !passwordForm.confirmPassword
     ) {
+      alert("Please complete all password fields.");
       return;
     }
 
@@ -92,18 +180,57 @@ export default function AdminProfile() {
       return;
     }
 
-    setShowPasswordModal(false);
-    alert("Password updated successfully.");
+    try {
+      const response = await api.post("/auth/admin/change-password/", {
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+        confirm_password: passwordForm.confirmPassword,
+      });
+
+      setShowPasswordModal(false);
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+
+      alert(response.data?.message || "Password updated successfully.");
+    } catch (err) {
+      console.error(err);
+      const data = err.response?.data;
+
+      if (data?.current_password?.[0]) {
+        alert(data.current_password[0]);
+      } else if (data?.new_password?.[0]) {
+        alert(data.new_password[0]);
+      } else if (data?.detail) {
+        alert(data.detail);
+      } else {
+        alert("Failed to update password.");
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="admin-profile-page">
+          <p>Loading profile...</p>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (
     <AdminLayout>
       <div className="admin-profile-page">
         <div className="admin-profile-header">
-          <div className="admin-profile-badge">N</div>
+          <div className="admin-profile-badge">
+            {(adminProfile.displayName || "N").charAt(0).toUpperCase()}
+          </div>
 
           <div>
-            <h1>{adminProfile.orgName}</h1>
+            <h1>{adminProfile.displayName}</h1>
             <p>{adminProfile.email}</p>
             <span className="role-badge">{adminProfile.role}</span>
           </div>
@@ -115,7 +242,7 @@ export default function AdminProfile() {
 
             <div className="info-list">
               <div className="info-row">
-                <span className="info-label">Organization Email</span>
+                <span className="info-label">Email</span>
                 <span className="info-value">{adminProfile.email}</span>
               </div>
 
@@ -126,53 +253,22 @@ export default function AdminProfile() {
 
               <div className="info-row">
                 <span className="info-label">Department</span>
-                <span className="info-value">{adminProfile.department}</span>
+                <span className="info-value">{adminProfile.department || "—"}</span>
               </div>
 
               <div className="info-row">
                 <span className="info-label">Phone</span>
-                <span className="info-value">{adminProfile.phone}</span>
+                <span className="info-value">{adminProfile.phone || "—"}</span>
               </div>
 
               <div className="info-row">
-                <span className="info-label">Location</span>
-                <span className="info-value">{adminProfile.location}</span>
-              </div>
-
-              <div className="info-row">
-                <span className="info-label">Account Type</span>
-                <span className="info-value">{adminProfile.accountType}</span>
+                <span className="info-label">Member ID</span>
+                <span className="info-value">{adminProfile.memberId || "—"}</span>
               </div>
 
               <div className="info-row">
                 <span className="info-label">Created</span>
-                <span className="info-value">{adminProfile.created}</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="profile-panel">
-            <h2>Admin Overview</h2>
-
-            <div className="overview-grid">
-              <div className="overview-card">
-                <span className="overview-number">{overview.coursesManaged}</span>
-                <span className="overview-label">Courses Managed</span>
-              </div>
-
-              <div className="overview-card">
-                <span className="overview-number">{overview.instructors}</span>
-                <span className="overview-label">Active Instructors</span>
-              </div>
-
-              <div className="overview-card">
-                <span className="overview-number">{overview.trainees}</span>
-                <span className="overview-label">Trainees</span>
-              </div>
-
-              <div className="overview-card warning">
-                <span className="overview-number">{overview.pendingInvites}</span>
-                <span className="overview-label">Pending Invites</span>
+                <span className="info-value">{adminProfile.created || "—"}</span>
               </div>
             </div>
           </section>
@@ -199,22 +295,22 @@ export default function AdminProfile() {
             <div className="modal-card">
               <h2>Edit Account Info</h2>
               <p className="modal-subtext">
-                Update the shared organization account details.
+                Update the saved account details.
               </p>
 
               <form onSubmit={handleSaveAccountInfo} className="profile-form">
                 <div className="form-group">
-                  <label>Organization Name</label>
+                  <label>Display Name</label>
                   <input
                     type="text"
-                    name="orgName"
-                    value={editForm.orgName}
+                    name="displayName"
+                    value={editForm.displayName}
                     onChange={handleEditChange}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>Organization Email</label>
+                  <label>Email</label>
                   <input
                     type="email"
                     name="email"
@@ -245,28 +341,6 @@ export default function AdminProfile() {
                   </div>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Location</label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={editForm.location}
-                      onChange={handleEditChange}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Account Type</label>
-                    <input
-                      type="text"
-                      name="accountType"
-                      value={editForm.accountType}
-                      onChange={handleEditChange}
-                    />
-                  </div>
-                </div>
-
                 <div className="modal-actions">
                   <button
                     type="button"
@@ -289,7 +363,7 @@ export default function AdminProfile() {
             <div className="modal-card">
               <h2>Change Password</h2>
               <p className="modal-subtext">
-                Update the password for this organization account.
+                Update the password for this admin account.
               </p>
 
               <form onSubmit={handleSavePassword} className="profile-form">
