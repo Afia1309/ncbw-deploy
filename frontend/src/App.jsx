@@ -16,6 +16,8 @@ import MemberProfile from "./pages/MemberProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCourseManagement from "./pages/AdminCourseManagement";
 import AdminProfile from "./pages/AdminProfile";
+import AdminFeedback from "./pages/AdminFeedback";
+import AdminReports from "./pages/AdminReports";
 
 export default function App() {
   return (
@@ -44,6 +46,8 @@ export default function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/courses" element={<AdminCourseManagement />} />
         <Route path="/admin/profile" element={<AdminProfile />} />
+        <Route path="/admin/feedback" element={<AdminFeedback />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
       </Routes>
     </BrowserRouter>
   );
