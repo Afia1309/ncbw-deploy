@@ -4,7 +4,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import re
 
-from .models import Profile
+from .models import Profile, Course
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -164,7 +164,10 @@ class UserListSerializer(serializers.ModelSerializer):
         return mapping.get(obj.profile.status, obj.profile.status)
 
     def get_courses(self, obj):
-        return "0"
+        annotated_count = getattr(obj, 'courses_count', None)
+        if annotated_count is not None:
+            return str(annotated_count)
+        return str(obj.courses_taught.count())
 
 
 class TraineeUpdateSerializer(serializers.Serializer):
@@ -176,3 +179,60 @@ class TraineeUpdateSerializer(serializers.Serializer):
         choices=['active', 'in_progress', 'inactive'],
         required=False
     )
+
+
+class InstructorOptionSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'name']
+
+    def get_name(self, obj):
+        full_name = f"{obj.first_name} {obj.last_name}".strip()
+        return full_name or obj.username
+
+
+class CourseSerializer(serializers.ModelSerializer):
+    instructor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = [
+            'id',
+            'name',
+            'description',
+            'open_date',
+            'instructor',
+            'instructor_name',
+            'enrollment',
+            'status',
+        ]
+
+    def get_instructor_name(self, obj):
+        full_name = f"{obj.instructor.first_name} {obj.instructor.last_name}".strip()
+        return full_name or obj.instructor.username
+
+
+class CourseCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = [
+            'name',
+            'description',
+            'instructor',
+            'open_date',
+            'status',
+        ]
+
+    def validate_instructor(self, value):
+        if not hasattr(value, 'profile'):
+            raise serializers.ValidationError("Selected user does not have a profile.")
+
+        if value.profile.role != 'instructor':
+            raise serializers.ValidationError("Selected user is not an instructor.")
+
+        if value.profile.status != 'active':
+            raise serializers.ValidationError("Only active instructors can be assigned to a course.")
+
+        return value

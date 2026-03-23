@@ -2,6 +2,7 @@ import re
 
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 
 from rest_framework import status
@@ -15,19 +16,24 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from training.models import Track, Enrollment, Module, ModuleProgress
 
-from .models import Profile, LoginSecurity
+from .models import Profile, LoginSecurity, Course
 from .serializers import (
     CustomTokenObtainPairSerializer,
     InstructorInviteSerializer,
     TraineeInviteSerializer,
     UserListSerializer,
     TraineeUpdateSerializer,
+    InstructorOptionSerializer,
+    CourseSerializer,
+    CourseCreateSerializer,
 )
 from .utils import (
     generate_member_id,
     send_postmark_email,
     build_invite_email_html,
     build_invite_email_text,
+    build_course_assignment_email_html,
+    build_course_assignment_email_text,
 )
 
 
@@ -284,7 +290,6 @@ def register(request):
                 if not hasattr(user, 'login_security'):
                     LoginSecurity.objects.create(user=user)
 
-            # Auto-enroll only trainees
             if user.profile.role == 'trainee':
                 track = Track.objects.first()
                 if track and not Enrollment.objects.filter(user=user, track=track).exists():
@@ -452,6 +457,8 @@ class AdminInstructorListView(APIView):
             profile__role='instructor'
         ).exclude(
             profile__status='deleted'
+        ).annotate(
+            courses_count=Count('courses_taught')
         ).order_by('-date_joined')
 
         serializer = UserListSerializer(instructors, many=True)
@@ -491,10 +498,7 @@ class AdminTraineeDetailView(APIView):
 
         if 'status' in serializer.validated_data:
             profile.status = serializer.validated_data['status']
-            if profile.status == 'active':
-                user.is_active = True
-            else:
-                user.is_active = False
+            user.is_active = profile.status == 'active'
             user.save(update_fields=['is_active'])
 
         profile.save()
@@ -525,3 +529,252 @@ class AdminInstructorDeleteView(APIView):
 
         user.profile.soft_delete()
         return Response({"message": "Instructor deleted successfully."})
+
+
+class AdminInstructorOptionsView(APIView):
+    permission_classes = [IsAdminUserByRole]
+
+    def get(self, request):
+        instructors = User.objects.filter(
+            profile__role='instructor',
+            profile__status='active'
+        ).exclude(
+            profile__status='deleted'
+        ).order_by('first_name', 'last_name', 'username')
+
+        serializer = InstructorOptionSerializer(instructors, many=True)
+        return Response(serializer.data)
+
+
+class AdminCourseListCreateView(APIView):
+    permission_classes = [IsAdminUserByRole]
+
+    def get(self, request):
+        courses = Course.objects.select_related('instructor').all()
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = CourseCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        course = serializer.save(created_by=request.user)
+
+        email_sent = False
+        email_detail = "Email not sent."
+
+        # Send assignment email only when course is Open
+        if course.status == "Open" and course.instructor and course.instructor.email:
+            instructor_name = (
+                f"{course.instructor.first_name} {course.instructor.last_name}".strip()
+                or course.instructor.username
+            )
+
+            html_body = build_course_assignment_email_html(
+                instructor_name=instructor_name,
+                course_name=course.name,
+                description=course.description,
+                open_date=course.open_date,
+                status=course.status,
+            )
+
+            text_body = build_course_assignment_email_text(
+                instructor_name=instructor_name,
+                course_name=course.name,
+                description=course.description,
+                open_date=course.open_date,
+                status=course.status,
+            )
+
+            email_sent, email_detail = send_postmark_email(
+                to_email=course.instructor.email,
+                subject="You have been assigned a new course",
+                html_body=html_body,
+                text_body=text_body,
+            )
+
+        return Response(
+            {
+                "message": "Course created successfully.",
+                "course": CourseSerializer(course).data,
+                "email_sent": email_sent,
+                "email_detail": email_detail,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+class AdminDashboardSummaryView(APIView):
+    permission_classes = [IsAdminUserByRole]
+
+    def get(self, request):
+        active_trainees = User.objects.filter(
+            profile__role='trainee',
+            profile__status='active'
+        ).exclude(
+            profile__status='deleted'
+        ).count()
+
+        instructors_count = User.objects.filter(
+            profile__role='instructor'
+        ).exclude(
+            profile__status='deleted'
+        ).count()
+
+        published_courses_count = Course.objects.filter(
+            status='Open'
+        ).count()
+
+        pending_invites_count = User.objects.filter(
+            profile__status='pending',
+            profile__role__in=['instructor', 'trainee']
+        ).exclude(
+            profile__status='deleted'
+        ).count()
+
+        return Response({
+            "active_trainees": active_trainees,
+            "instructors_count": instructors_count,
+            "published_courses_count": published_courses_count,
+            "pending_invites_count": pending_invites_count,
+        })
+    
+class AdminCourseDetailView(APIView):
+    permission_classes = [IsAdminUserByRole]
+
+    def delete(self, request, course_id):
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response(
+                {"detail": "Course not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        course.delete()
+
+        return Response(
+            {"message": "Course deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+class AdminProfileView(APIView):
+    permission_classes = [IsAdminUserByRole]
+
+    def get(self, request):
+        user = request.user
+        profile = user.profile
+
+        return Response({
+            "user": {
+                "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                "member_id": profile.member_id or user.username,
+                "email": user.email,
+                "phone": profile.phone,
+                "department": profile.department,
+                "role": profile.role,
+                "status": profile.status,
+                "created": user.date_joined,
+            }
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        user = request.user
+        profile = user.profile
+
+        display_name = request.data.get("name")
+        email = request.data.get("email")
+        phone = request.data.get("phone")
+        department = request.data.get("department")
+
+        if display_name is not None:
+            display_name = display_name.strip()
+            if display_name:
+                parts = display_name.split()
+                user.first_name = parts[0]
+                user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+            else:
+                user.first_name = ""
+                user.last_name = ""
+
+        if email is not None:
+            cleaned_email = email.lower().strip()
+            if User.objects.filter(email__iexact=cleaned_email).exclude(id=user.id).exists():
+                return Response(
+                    {"email": ["This email is already registered."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user.email = cleaned_email
+
+        user.save()
+
+        if phone is not None:
+            profile.phone = phone
+
+        if department is not None:
+            profile.department = department
+
+        profile.save()
+
+        return Response({
+            "message": "Admin profile updated successfully.",
+            "user": {
+                "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                "member_id": profile.member_id or user.username,
+                "email": user.email,
+                "phone": profile.phone,
+                "department": profile.department,
+                "role": profile.role,
+                "status": profile.status,
+                "created": user.date_joined,
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class AdminChangePasswordView(APIView):
+    permission_classes = [IsAdminUserByRole]
+
+    def post(self, request):
+        user = request.user
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not current_password or not new_password or not confirm_password:
+            return Response(
+                {"detail": "All password fields are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not user.check_password(current_password):
+            return Response(
+                {"current_password": ["Current password is incorrect."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user.check_password(new_password):
+            return Response(
+                {"new_password": ["New password must be different from current password."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if new_password != confirm_password:
+            return Response(
+                {"new_password": ["Passwords do not match."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        is_valid, error_msg = validate_password_strength(new_password)
+        if not is_valid:
+            return Response(
+                {"new_password": [error_msg]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.set_password(new_password)
+        user.save()
+
+        if hasattr(user, "login_security"):
+            user.login_security.reset()
+
+        return Response(
+            {"message": "Password changed successfully."},
+            status=status.HTTP_200_OK
+        )

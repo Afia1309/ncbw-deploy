@@ -1,90 +1,82 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../components/AdminLayout";
 import "./AdminCourseManagement.css";
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
+
 export default function AdminCourseManagement() {
-  const instructors = [
-    "Kofi Mensah",
-    "Ama Boateng",
-    "Yaw Asante",
-    "Efua Nyarko",
-    "Kojo Mensimah",
-  ];
-
-  const [courses, setCourses] = useState([
-    {
-      id: 1,
-      name: "Leadership Foundations",
-      description: "Introduction to foundational leadership principles.",
-      openDate: "Mar 1, 2026",
-      instructor: "Kofi Mensah",
-      enrollment: 35,
-      status: "Open",
-    },
-    {
-      id: 2,
-      name: "Team Communication",
-      description: "Build effective communication and collaboration skills.",
-      openDate: "Mar 8, 2026",
-      instructor: "Ama Boateng",
-      enrollment: 28,
-      status: "Open",
-    },
-    {
-      id: 3,
-      name: "Conflict Resolution",
-      description: "Learn how to manage and resolve conflict well.",
-      openDate: "Mar 15, 2026",
-      instructor: "Yaw Asante",
-      enrollment: 22,
-      status: "Open",
-    },
-    {
-      id: 4,
-      name: "Time Management",
-      description: "Practical strategies for planning and prioritization.",
-      openDate: "Apr 2, 2026",
-      instructor: "Efua Nyarko",
-      enrollment: 18,
-      status: "Draft",
-    },
-    {
-      id: 5,
-      name: "Servant Leadership",
-      description: "Understand leadership through service and influence.",
-      openDate: "Apr 10, 2026",
-      instructor: "Kofi Mensah",
-      enrollment: 31,
-      status: "Open",
-    },
-    {
-      id: 6,
-      name: "Public Speaking",
-      description: "Develop confidence and clarity in public speaking.",
-      openDate: "Apr 18, 2026",
-      instructor: "Ama Boateng",
-      enrollment: 16,
-      status: "Open",
-    },
-  ]);
-
+  const [courses, setCourses] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    instructor: instructors[0],
+    instructor: "",
     openDate: "",
     status: "Open",
   });
 
+  function getAuthHeaders() {
+    const token = localStorage.getItem("access");
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
+  async function fetchCoursePageData() {
+    try {
+      setLoading(true);
+
+      const [coursesRes, instructorsRes] = await Promise.all([
+        fetch(`${API_BASE}/admin/courses/`, {
+          headers: getAuthHeaders(),
+        }),
+        fetch(`${API_BASE}/admin/instructors/options/`, {
+          headers: getAuthHeaders(),
+        }),
+      ]);
+
+      if (!coursesRes.ok || !instructorsRes.ok) {
+        throw new Error("Failed to load course page data.");
+      }
+
+      const coursesData = await coursesRes.json();
+      const instructorsData = await instructorsRes.json();
+
+      setCourses(coursesData);
+      setInstructors(instructorsData);
+
+      if (instructorsData.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          instructor: String(instructorsData[0].id),
+        }));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Unable to load courses.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchCoursePageData();
+  }, []);
+
   const filteredCourses = useMemo(() => {
+    const value = searchTerm.toLowerCase();
+
     return courses.filter((course) => {
-      const value = searchTerm.toLowerCase();
+      const instructorName = (course.instructor_name || "").toLowerCase();
       return (
         course.name.toLowerCase().includes(value) ||
-        course.instructor.toLowerCase().includes(value) ||
+        instructorName.includes(value) ||
         course.status.toLowerCase().includes(value)
       );
     });
@@ -94,7 +86,7 @@ export default function AdminCourseManagement() {
     setFormData({
       name: "",
       description: "",
-      instructor: instructors[0],
+      instructor: instructors.length > 0 ? String(instructors[0].id) : "",
       openDate: "",
       status: "Open",
     });
@@ -113,29 +105,93 @@ export default function AdminCourseManagement() {
     }));
   }
 
-  function handleSaveCourse(e) {
+  async function handleSaveCourse(e) {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.description.trim() || !formData.openDate) {
+    if (
+      !formData.name.trim() ||
+      !formData.description.trim() ||
+      !formData.openDate ||
+      !formData.instructor
+    ) {
+      alert("Please complete all course fields.");
       return;
     }
 
-    const newCourse = {
-      id: Date.now(),
-      name: formData.name,
-      description: formData.description,
-      instructor: formData.instructor,
-      openDate: new Date(formData.openDate).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      enrollment: 0,
-      status: formData.status,
-    };
+    try {
+      const response = await fetch(`${API_BASE}/admin/courses/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+          instructor: Number(formData.instructor),
+          open_date: formData.openDate,
+          status: formData.status,
+        }),
+      });
 
-    setCourses((prev) => [newCourse, ...prev]);
-    setShowModal(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Failed to create course.");
+      }
+
+      setCourses((prev) => [data.course, ...prev]);
+      setShowModal(false);
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
+  }
+
+  async function handleDeleteCourse(courseId) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this course?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/courses/${courseId}/`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+     });
+
+      let data = {};
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Failed to delete course.");
+      }
+
+      setCourses((prev) => prev.filter((course) => course.id !== courseId));
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
+  }
+
+  function formatDate(dateString) {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="admin-course-page">
+          <p>Loading courses...</p>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (
@@ -173,6 +229,7 @@ export default function AdminCourseManagement() {
                   <th>Instructor</th>
                   <th>Enrollment</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
 
@@ -182,8 +239,8 @@ export default function AdminCourseManagement() {
                     <tr key={course.id}>
                       <td>{course.name}</td>
                       <td>{course.description}</td>
-                      <td>{course.openDate}</td>
-                      <td>{course.instructor}</td>
+                      <td>{formatDate(course.open_date)}</td>
+                      <td>{course.instructor_name}</td>
                       <td>{course.enrollment}</td>
                       <td>
                         <span
@@ -194,11 +251,19 @@ export default function AdminCourseManagement() {
                           {course.status}
                         </span>
                       </td>
+                      <td>
+                        <button
+                          className="table-action-btn delete"
+                          onClick={() => handleDeleteCourse(course.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="empty-state">
+                    <td colSpan="7" className="empty-state">
                       No courses found.
                     </td>
                   </tr>
@@ -248,8 +313,8 @@ export default function AdminCourseManagement() {
                       onChange={handleChange}
                     >
                       {instructors.map((instructor) => (
-                        <option key={instructor} value={instructor}>
-                          {instructor}
+                        <option key={instructor.id} value={instructor.id}>
+                          {instructor.name}
                         </option>
                       ))}
                     </select>

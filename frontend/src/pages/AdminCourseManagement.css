@@ -1,9 +1,9 @@
 .admin-course-page {
   padding: 32px 40px 40px;
   margin-left: 12px;
-  background: #081b33;
+  background: #ffffff;
   min-height: 100vh;
-  color: #ffffff;
+  color: #111827;
 }
 
 .course-page-header {
@@ -18,13 +18,13 @@
   margin: 0 0 8px;
   font-size: 28px;
   font-weight: 700;
-  color: #f8fafc;
+  color: #0f2a44;
 }
 
 .course-page-header p {
   margin: 0;
   font-size: 15px;
-  color: #cbd5e1;
+  color: #6b7280;
 }
 
 .add-course-btn {
@@ -45,9 +45,9 @@
 .course-search {
   width: 100%;
   max-width: 420px;
-  background: #1f2d44;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
   border-radius: 14px;
   padding: 12px 14px;
   font-size: 14px;
@@ -55,14 +55,15 @@
 }
 
 .course-search::placeholder {
-  color: #94a3b8;
+  color: #9ca3af;
 }
 
 .course-table-panel {
-  background: #1f2d44;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 24px;
   padding: 20px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
 .course-table-scroll {
@@ -75,12 +76,12 @@
 .course-table {
   width: 100%;
   border-collapse: collapse;
-  color: #f8fafc;
+  color: #111827;
   min-width: 1000px;
 }
 
 .course-table thead tr {
-  background: rgba(255, 255, 255, 0.04);
+  background: #f9fafb;
 }
 
 .course-table th {
@@ -88,23 +89,23 @@
   padding: 15px 18px;
   font-size: 14px;
   font-weight: 600;
-  color: #c9a227;
+  color: #0f2a44;
   position: sticky;
   top: 0;
-  background: #2a3b57;
+  background: #f9fafb;
   z-index: 1;
 }
 
 .course-table td {
   padding: 18px;
   font-size: 14px;
-  color: #e2e8f0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #374151;
+  border-top: 1px solid #e5e7eb;
   vertical-align: top;
 }
 
 .course-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.025);
+  background: #f9fafb;
 }
 
 .course-status {
@@ -119,25 +120,25 @@
 }
 
 .status-open {
-  background: rgba(34, 197, 94, 0.14);
-  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
 }
 
 .status-draft {
   background: rgba(201, 162, 39, 0.16);
-  color: #e7c34d;
+  color: #c9a227;
 }
 
 .empty-state {
   text-align: center;
-  color: #cbd5e1;
+  color: #6b7280;
   padding: 30px;
 }
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.72);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,21 +149,23 @@
 .modal-card {
   width: 100%;
   max-width: 620px;
-  background: #1f2d44;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 24px;
   padding: 28px;
-  color: #ffffff;
+  color: #111827;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
 }
 
 .modal-card h2 {
   margin: 0 0 8px;
   font-size: 24px;
+  color: #0f2a44;
 }
 
 .modal-subtext {
   margin: 0 0 22px;
-  color: #cbd5e1;
+  color: #6b7280;
   font-size: 14px;
 }
 
@@ -181,19 +184,32 @@
 .form-group label {
   font-size: 14px;
   font-weight: 600;
-  color: #f8fafc;
+  color: #374151;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
-  background: #081b33;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
   border-radius: 14px;
   padding: 12px 14px;
   font-size: 14px;
   outline: none;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #9ca3af;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus,
+.course-search:focus {
+  border-color: #c9a227;
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.14);
 }
 
 .form-group textarea {
@@ -228,7 +244,22 @@
 }
 
 .modal-btn.secondary {
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #ffffff;
+  color: #0f2a44;
+  border: 1px solid #d1d5db;
+}
+
+@media (max-width: 768px) {
+  .admin-course-page {
+    padding: 24px 20px 28px;
+  }
+
+  .course-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
 }

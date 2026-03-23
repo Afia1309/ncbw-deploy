@@ -156,6 +156,40 @@ class Profile(models.Model):
         return f"{self.user.username} - {self.role} - {self.status}"
 
 
+class Course(models.Model):
+    STATUS_CHOICES = [
+        ('Open', 'Open'),
+        ('Draft', 'Draft'),
+    ]
+
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    instructor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='courses_taught',
+        limit_choices_to={'profile__role': 'instructor'}
+    )
+    open_date = models.DateField()
+    enrollment = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='courses_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['open_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.instructor.username}"
+
+
 @receiver(post_save, sender=User)
 def create_user_related(sender, instance, created, **kwargs):
     if created:

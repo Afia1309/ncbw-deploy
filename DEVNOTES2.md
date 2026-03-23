@@ -1,5 +1,5 @@
 # Admin System Notes for Backend Development
-
+**Author:** Afua Atiase
 ## 1. Role Structure
 
 The system should separate users into three roles:
