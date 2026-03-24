@@ -6,6 +6,7 @@ import "./Dashboard.css";
 export default function CourseSelection() {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
+  const [certificateEligible, setCertificateEligible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -31,6 +32,7 @@ export default function CourseSelection() {
 
       if (response.status === 401) {
         localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
         navigate("/login");
         return;
       }
@@ -41,8 +43,10 @@ export default function CourseSelection() {
 
       const data = await response.json();
       setCourses(data.required_modules || []);
+      setCertificateEligible(data.progress?.certificate_eligible || false);
     } catch (err) {
       setError(err.message);
+      console.error("Courses error:", err);
     } finally {
       setLoading(false);
     }
@@ -69,9 +73,6 @@ export default function CourseSelection() {
         return "Not Started";
     }
   };
-
-  const allComplete =
-    courses.length > 0 && courses.every((course) => course.status === "completed");
 
   if (loading) {
     return (
@@ -154,10 +155,10 @@ export default function CourseSelection() {
           );
         })}
 
-        <div className={`course-certificate-banner ${allComplete ? "complete" : ""}`}>
-          {allComplete
-            ? "All courses are complete. Your certificate is ready to view."
-            : "Complete all courses to view your certificate."}
+        <div className={`course-certificate-banner ${certificateEligible ? "complete" : ""}`}>
+          {certificateEligible
+            ? "All required modules are complete. Your certificate is ready to view."
+            : "Complete all required modules to view your certificate."}
         </div>
       </div>
     </MemberLayout>

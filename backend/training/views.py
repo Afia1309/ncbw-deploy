@@ -3,8 +3,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth.models import User
+import uuid
 
-from .models import Enrollment, Module, ModuleProgress
+from .models import Enrollment, Module, ModuleProgress, Certificate
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -63,6 +64,14 @@ def dashboard(request):
     track = enrollment.track
 
     modules_qs = Module.objects.filter(track=track).order_by("order")
+    
+    for module in modules_qs:
+        ModuleProgress.objects.get_or_create(
+            user=u,
+            module=module,
+            defaults={"status": "not_started"}
+        )
+
     progress_rows = ModuleProgress.objects.filter(user=u, module__track=track)
     progress_map = {p.module_id: p for p in progress_rows}
 
@@ -98,6 +107,7 @@ def dashboard(request):
             lock_next = True
 
     progress_pct = int(round((required_completed / required_total) * 100)) if required_total else 0
+    certificate_eligible = required_total > 0 and required_completed == required_total
 
     return Response({
         "user": {
@@ -114,6 +124,7 @@ def dashboard(request):
             "percent_complete": progress_pct,
             "completed_required": required_completed,
             "total_required": required_total,
+            "certificate_eligible": certificate_eligible,
         },
         "required_modules": modules_out,
     })
@@ -148,3 +159,61 @@ def update_module_status(request, module_id):
 
     obj.save()
     return Response({"ok": True})
+
+
+def user_completed_required_modules(user, track):
+    required_modules = Module.objects.filter(track=track, required=True)
+    total_required = required_modules.count()
+
+    if total_required == 0:
+        return False
+
+    completed_required = ModuleProgress.objects.filter(
+        user=user,
+        module__track=track,
+        module__required=True,
+        status="completed"
+    ).count()
+
+    return completed_required == total_required
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_certificate(request):
+    u = request.user
+
+    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
+    if not enrollment:
+        return Response({"detail": "User is not enrolled in a track."}, status=400)
+
+    track = enrollment.track
+
+    if not user_completed_required_modules(u, track):
+        return Response(
+            {
+                "eligible": False,
+                "detail": "User has not completed all required modules."
+            },
+            status=400
+        )
+
+    certificate, created = Certificate.objects.get_or_create(
+        user=u,
+        track=track,
+        defaults={
+            "certificate_code": f"CERT-{uuid.uuid4().hex[:10].upper()}"
+        }
+    )
+
+    return Response({
+        "eligible": True,
+        "certificate": {
+            "id": certificate.id,
+            "user": u.get_full_name() or u.username,
+            "member_id": getattr(u.profile, "member_id", u.username) if hasattr(u, "profile") else u.username,
+            "track": track.name,
+            "issued_date": str(certificate.issued_date),
+            "certificate_code": certificate.certificate_code,
+        }
+    })

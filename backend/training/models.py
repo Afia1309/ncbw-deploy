@@ -54,3 +54,15 @@ class ModuleProgress(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.module.title} {self.status}"
+
+class Certificate(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="certificates")
+    track = models.ForeignKey(Track, on_delete=models.CASCADE, related_name="certificates")
+    issued_date = models.DateField(auto_now_add=True)
+    certificate_code = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        unique_together = ("user", "track")
+
+    def __str__(self):
+        return f"{self.user.username} - {self.track.name} - {self.issued_date}"
