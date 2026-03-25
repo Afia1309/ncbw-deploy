@@ -1,111 +1,81 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api/apiClient";
-import "./Dashboard.css";
+import "../Auth.css";
+import bgImage from "../assets/login-bg.jpg";
 
-export default function MemberDashboard() {
-  const [profile, setProfile] = useState(null);
-  const [modules, setModules] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+export default function ForgotPassword() {
+  const [memberId, setMemberId] = useState("");
+  const [status, setStatus] = useState({ type: "", msg: "" });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setErr("");
-        const [pRes, mRes] = await Promise.all([
-          api.get("me/"),
-          api.get("me/modules/"),
-        ]);
-        setProfile(pRes.data);
-        setModules(mRes.data);
-      } catch (e) {
-        console.error(e);
-        setErr("Could not load dashboard data.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus({ type: "", msg: "" });
+    setLoading(true);
 
-  const { percent, required, doneCount, totalCount } = useMemo(() => {
-    const req = modules.filter((m) => m.required);
-    const done = req.filter((m) => m.completed).length;
-    return {
-      required: req,
-      doneCount: done,
-      totalCount: req.length,
-      percent: req.length ? Math.round((done / req.length) * 100) : 0,
-    };
-  }, [modules]);
+    try {
+      // ✅ correct path with your apiClient baseURL
+      await api.post("/auth/password-reset/", { member_id: memberId });
 
-  if (loading) return <div className="dash-page">Loading…</div>;
-  if (err) return <div className="dash-page">{err}</div>;
-  if (!profile) return <div className="dash-page">Not logged in.</div>;
+      setStatus({
+        type: "success",
+        msg: "If an account exists for that Member ID, a reset link has been sent to the email on file.",
+      });
+      setMemberId("");
+    } catch (err) {
+      console.error(err);
+      setStatus({
+        type: "error",
+        msg: "Something went wrong. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="dash-page">
-      {/* LEFT SIDEBAR */}
-      <aside className="dash-sidebar">
-        <div className="dash-profile">
-          <div className="dash-avatar" aria-hidden />
-          <div className="dash-name">{profile.name || "Member"}</div>
-          <div className="dash-id">Member ID: {profile.member_id || "—"}</div>
-        </div>
+    <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
+      <div className="auth-left">
+        <h1 className="auth-title">
+          Welcome to NCBW
+          <br />
+          Training Portal
+        </h1>
+      </div>
 
-        <nav className="dash-nav">
-          <button className="dash-nav-item active">Dashboard</button>
-          <button className="dash-nav-item">Notifications</button>
-          <button className="dash-nav-item">Manage Profile</button>
-          <button className="dash-nav-item">Modules</button>
-          <button className="dash-nav-item">Account</button>
-          <button className="dash-nav-item danger">Logout</button>
-        </nav>
-      </aside>
+      <div className="auth-card">
+        <h2>Reset Password</h2>
+        <p>Enter your Member ID and we’ll send a password reset link.</p>
 
-      {/* MAIN */}
-      <main className="dash-main">
-        <div className="dash-topbar">
-          <div>
-            <div className="dash-title">Dashboard</div>
-            <div className="dash-subtitle">Leadership Track: {profile.track || "—"}</div>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="auth-field">
+            <label htmlFor="memberId">Member ID</label>
+            <input
+              id="memberId"
+              className="auth-input"
+              value={memberId}
+              onChange={(e) => setMemberId(e.target.value)}
+              placeholder="e.g. 12345"
+              required
+            />
           </div>
 
-          <button className="dash-primary-btn">View Profile</button>
-        </div>
+          <button type="submit" className="auth-button" disabled={loading}>
+            {loading ? "Sending..." : "Send reset link"}
+          </button>
 
-        {/* Progress Card */}
-        <section className="dash-card">
-          <div className="dash-card-title">
-            Your progress is {percent}% complete
-          </div>
-          <div className="dash-progress-wrap">
-            <div className="dash-progress-bar">
-              <div className="dash-progress-fill" style={{ width: `${percent}%` }} />
+          {status.msg && (
+            <div className={status.type === "error" ? "auth-error" : "auth-success"}>
+              {status.msg}
             </div>
-            <div className="dash-progress-meta">
-              Completed {doneCount} of {totalCount} required modules
-            </div>
+          )}
+
+          <div className="auth-footer" style={{ marginTop: 12 }}>
+            <Link to="/">Back to login</Link>
           </div>
-        </section>
-
-        {/* Required Modules */}
-        <section className="dash-card">
-          <div className="dash-card-title">Required Modules</div>
-
-          <div className="dash-module-grid">
-            {required.map((m) => (
-              <div key={m.id} className="dash-module">
-                <div className="dash-module-name">{m.title}</div>
-                <div className={`dash-badge ${m.completed ? "done" : "todo"}`}>
-                  {m.completed ? "Completed" : "Incomplete"}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        
-      </main>
+        </form>
+      </div>
     </div>
   );
 }
