@@ -155,11 +155,24 @@ export default function CourseSelection() {
           );
         })}
 
-        <div className={`course-certificate-banner ${certificateEligible ? "complete" : ""}`}>
-          {certificateEligible
-            ? "All required modules are complete. Your certificate is ready to view."
-            : "Complete all required modules to view your certificate."}
-        </div>
+         <div className={`course-certificate-banner ${certificateEligible ? "complete" : ""}`}>
+            {certificateEligible   ? (
+              <>
+                <div>All required modules are complete. Your certificate is ready to view.</div>
+            
+                <button
+                  className="primary-btn"
+                  style={{ marginTop: "12px" }}
+                  onClick={() => navigate("/member/certificate")}
+                >
+                  View Certificate
+                </button>
+              </>
+            ) : (
+              "Complete all required modules to view your certificate."
+            )}
+
+          </div>
       </div>
     </MemberLayout>
   );

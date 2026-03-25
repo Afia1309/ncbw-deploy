@@ -1,4 +1,6 @@
 from django.utils import timezone
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -217,3 +219,55 @@ def my_certificate(request):
             "certificate_code": certificate.certificate_code,
         }
     })
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def certificate_pdf(request):
+    u = request.user
+
+    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
+    if not enrollment:
+        return Response({"detail": "User is not enrolled in a track."}, status=400)
+
+    track = enrollment.track
+
+    if not user_completed_required_modules(u, track):
+        return Response({"detail": "Not eligible for certificate."}, status=400)
+
+    certificate, _ = Certificate.objects.get_or_create(
+        user=u,
+        track=track,
+        defaults={
+            "certificate_code": f"CERT-{uuid.uuid4().hex[:10].upper()}"
+        }
+    )
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = 'attachment; filename="certificate.pdf"'
+
+    p = canvas.Canvas(response)
+    p.setTitle("Certificate of Completion")
+
+    p.setFont("Helvetica-Bold", 22)
+    p.drawCentredString(300, 750, "Certificate of Completion")
+
+    p.setFont("Helvetica", 14)
+    p.drawCentredString(300, 710, "This certifies that")
+
+    p.setFont("Helvetica-Bold", 18)
+    p.drawCentredString(300, 675, u.get_full_name() or u.username)
+
+    p.setFont("Helvetica", 14)
+    p.drawCentredString(300, 635, "has successfully completed the")
+
+    p.setFont("Helvetica-Bold", 16)
+    p.drawCentredString(300, 600, track.name)
+
+    p.setFont("Helvetica", 12)
+    p.drawCentredString(300, 555, f"Issued Date: {certificate.issued_date}")
+    p.drawCentredString(300, 530, f"Certificate Code: {certificate.certificate_code}")
+
+    p.showPage()
+    p.save()
+
+    return response

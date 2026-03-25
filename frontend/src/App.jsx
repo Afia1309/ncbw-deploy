@@ -12,6 +12,7 @@ import CourseSelection from "./pages/CourseSelection";
 import CourseDisplay from "./pages/CourseDisplay";
 import CourseMaterial from "./pages/CourseMaterial";
 import MemberProfile from "./pages/MemberProfile";
+import Certificate from "./pages/Certificate";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCourseManagement from "./pages/AdminCourseManagement";
@@ -36,11 +37,13 @@ export default function App() {
         <Route path="/member/manage-profile" element={<ManageProfile />} />
         <Route path="/member/modules" element={<Modules />} />
         <Route path="/member/account" element={<Account />} />
+        
 
         {/* Member courses */}
         <Route path="/member/courses" element={<CourseSelection />} />
         <Route path="/member/course/:id" element={<CourseDisplay />} />
         <Route path="/member/material/:id" element={<CourseMaterial />} />
+        <Route path="/member/certificate" element={<Certificate />} />
 
         {/* Admin routes */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
