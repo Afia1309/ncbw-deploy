@@ -1,7 +1,32 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import MemberLayout from "../../components/MemberLayout";
 import "./Dashboard.css";
+
+const MAX_FEEDBACK_LENGTH = 500;
+
+function FeedbackStars({ value, onChange }) {
+  return (
+    <div className="course-feedback-stars" aria-label="Select a star rating">
+      {[1, 2, 3, 4, 5].map((star) => {
+        const filled = star <= value;
+
+        return (
+          <button
+            key={star}
+            type="button"
+            className={`course-feedback-star ${filled ? "filled" : ""}`}
+            onClick={() => onChange(star)}
+            aria-label={`${star} star${star > 1 ? "s" : ""}`}
+            aria-pressed={filled}
+          >
+            ★
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function CourseDisplay() {
   const { id } = useParams();
@@ -9,10 +34,27 @@ export default function CourseDisplay() {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
     fetchCourseDetails();
   }, [id]);
+
+  useEffect(() => {
+    if (!isFeedbackOpen) {
+      return undefined;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isFeedbackOpen]);
 
   const fetchCourseDetails = async () => {
     try {
@@ -60,6 +102,32 @@ export default function CourseDisplay() {
     return "Not Started";
   };
 
+  const openFeedbackModal = () => {
+    setFeedbackSubmitted(false);
+    setIsFeedbackOpen(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setIsFeedbackOpen(false);
+    setFeedbackMessage("");
+    setFeedbackRating(0);
+  };
+
+  const handleFeedbackSubmit = (event) => {
+    event.preventDefault();
+
+    if (!feedbackMessage.trim() || !feedbackRating) {
+      return;
+    }
+
+    setFeedbackSubmitted(true);
+
+    window.setTimeout(() => {
+      closeFeedbackModal();
+      setFeedbackSubmitted(false);
+    }, 800);
+  };
+
   if (loading) {
     return (
       <MemberLayout title="Loading...">
@@ -80,9 +148,16 @@ export default function CourseDisplay() {
   const isComplete = course.status === "completed";
   const progress =
     course.status === "completed" ? 100 : course.status === "in_progress" ? 50 : 0;
+  const isSubmitDisabled = !feedbackMessage.trim() || !feedbackRating;
 
   return (
     <MemberLayout title={course.title}>
+      {feedbackSubmitted && (
+        <div className="dash-success course-feedback-success">
+          Feedback submitted successfully.
+        </div>
+      )}
+
       <div className="course-display-grid">
         <section className="course-details-card">
           <div className="dash-section-title">Course Details</div>
@@ -126,7 +201,7 @@ export default function CourseDisplay() {
           </div>
 
           <div className="course-detail-actions">
-            <button className="secondary-btn" type="button">
+            <button className="secondary-btn" type="button" onClick={openFeedbackModal}>
               Send Feedback
             </button>
           </div>
@@ -188,6 +263,72 @@ export default function CourseDisplay() {
           </div>
         </section>
       </div>
+
+      {isFeedbackOpen && (
+        <div className="course-feedback-modal-overlay" onClick={closeFeedbackModal}>
+          <div
+            className="course-feedback-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="course-feedback-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="course-feedback-close"
+              aria-label="Close feedback form"
+              onClick={closeFeedbackModal}
+            >
+              ×
+            </button>
+
+            <form className="course-feedback-form" onSubmit={handleFeedbackSubmit}>
+              <div className="course-feedback-head">
+                <h2 id="course-feedback-title" className="course-feedback-title">
+                  Send Feedback
+                </h2>
+                <p className="course-feedback-subtext">
+                  Tell us what worked well or what should be improved for {course.title}.
+                </p>
+              </div>
+
+              <div className="course-feedback-field">
+                <label className="course-feedback-label" htmlFor="course-feedback-message">
+                  Message
+                </label>
+                <textarea
+                  id="course-feedback-message"
+                  className="course-feedback-textarea"
+                  value={feedbackMessage}
+                  onChange={(event) =>
+                    setFeedbackMessage(event.target.value.slice(0, MAX_FEEDBACK_LENGTH))
+                  }
+                  maxLength={MAX_FEEDBACK_LENGTH}
+                  placeholder="Share your feedback here..."
+                  rows={7}
+                />
+                <div className="course-feedback-count">
+                  {feedbackMessage.length}/{MAX_FEEDBACK_LENGTH}
+                </div>
+              </div>
+
+              <div className="course-feedback-field">
+                <div className="course-feedback-label">Rating</div>
+                <FeedbackStars value={feedbackRating} onChange={setFeedbackRating} />
+              </div>
+
+              <div className="course-feedback-actions">
+                <button type="button" className="secondary-btn" onClick={closeFeedbackModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-btn" disabled={isSubmitDisabled}>
+                  Send
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </MemberLayout>
   );
 }
