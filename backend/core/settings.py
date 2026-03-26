@@ -208,6 +208,18 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN", "")
 POSTMARK_FROM_EMAIL = os.getenv("POSTMARK_FROM_EMAIL", "")
 
+# --------------------------------------------------
+# Email Settings
+# --------------------------------------------------
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = "nationalcoalitionbw@gmail.com"
+EMAIL_HOST_PASSWORD = "pjlopxsfyuvsljjr"
+DEFAULT_FROM_EMAIL = "nationalcoalitionbw@gmail.com"
 
 # --------------------------------------------------
 # Default email fallback

@@ -15,8 +15,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      // ✅ correct path with your apiClient baseURL
-      await api.post("/auth/password-reset/", { member_id: memberId });
+      await api.post("auth/password-reset/", { member_id: memberId });
 
       setStatus({
         type: "success",

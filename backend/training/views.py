@@ -1,11 +1,15 @@
 from django.utils import timezone
 from django.http import HttpResponse
+from django.core.mail import EmailMessage
+from django.utils import timezone
 from reportlab.pdfgen import canvas
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 import uuid
+
+from io import BytesIO
 
 from .models import Enrollment, Module, ModuleProgress, Certificate
 
@@ -154,6 +158,8 @@ def update_module_status(request, module_id):
     obj.status = status
     obj.last_activity = timezone.now()
 
+    obj.save()
+
     if status == "completed":
         obj.completed_at = timezone.now()
     else:
@@ -178,6 +184,79 @@ def user_completed_required_modules(user, track):
     ).count()
 
     return completed_required == total_required
+
+def build_certificate_pdf_bytes(user, track, issued_date, certificate_code):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer)
+
+    p.setTitle("Certificate of Completion")
+
+    p.setFont("Helvetica-Bold", 22)
+    p.drawCentredString(300, 750, "Certificate of Completion")
+
+    p.setFont("Helvetica", 14)
+    p.drawCentredString(300, 710, "This certifies that")
+
+    p.setFont("Helvetica-Bold", 18)
+    p.drawCentredString(300, 675, user.get_full_name() or user.username)
+
+    p.setFont("Helvetica", 14)
+    p.drawCentredString(300, 635, "has successfully completed the")
+
+    p.setFont("Helvetica-Bold", 16)
+    p.drawCentredString(300, 600, track.name)
+
+    p.setFont("Helvetica", 12)
+    p.drawCentredString(300, 555, f"Issued Date: {issued_date}")
+    p.drawCentredString(300, 530, f"Certificate Code: {certificate_code}")
+
+    p.showPage()
+    p.save()
+
+    buffer.seek(0)
+    return buffer.read()
+
+
+def email_certificate_if_ready(user, track):
+    if not user_completed_required_modules(user, track):
+        return
+
+    certificate, _ = Certificate.objects.get_or_create(
+        user=user,
+        track=track,
+        defaults={
+            "certificate_code": f"CERT-{uuid.uuid4().hex[:10].upper()}"
+        }
+    )
+
+    if certificate.emailed_at:
+        return
+
+    if not user.email:
+        return
+
+    pdf_bytes = build_certificate_pdf_bytes(
+        user=user,
+        track=track,
+        issued_date=certificate.issued_date,
+        certificate_code=certificate.certificate_code,
+    )
+
+    email = EmailMessage(
+        subject="Your Certificate of Completion",
+        body=(
+            f"Hello {user.get_full_name() or user.username},\n\n"
+            f"Congratulations on completing the {track.name} track.\n"
+            "Your certificate of completion is attached as a PDF.\n"
+        ),
+        to=[user.email],
+    )
+
+    email.attach("certificate.pdf", pdf_bytes, "application/pdf")
+    email.send(fail_silently=False)
+
+    certificate.emailed_at = timezone.now()
+    certificate.save(update_fields=["emailed_at"])
 
 
 @api_view(["GET"])

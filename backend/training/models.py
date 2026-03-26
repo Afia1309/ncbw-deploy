@@ -60,6 +60,7 @@ class Certificate(models.Model):
     track = models.ForeignKey(Track, on_delete=models.CASCADE, related_name="certificates")
     issued_date = models.DateField(auto_now_add=True)
     certificate_code = models.CharField(max_length=100, unique=True)
+    emailed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("user", "track")
