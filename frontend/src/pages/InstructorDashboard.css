@@ -1,0 +1,105 @@
+.instructor-page {
+  background: #f9fafb;
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.section-title {
+  color: #18324b;
+  font-size: 30px;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+}
+
+.section-subtitle {
+  color: #6b7280;
+  font-size: 16px;
+  margin: 0;
+}
+
+.gold-button-link {
+  background: #c9a227;
+  color: white;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.course-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+}
+
+.course-tile-link {
+  text-decoration: none;
+}
+
+.course-tile {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.course-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+}
+
+.course-tile-image {
+  height: 220px;
+  background-size: cover;
+  background-position: center;
+}
+
+.course-tile-body {
+  padding: 18px 20px 20px;
+}
+
+.course-tile-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.course-tile-top h3 {
+  color: #18324b;
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.course-tile-body p {
+  color: #6b7280;
+  font-size: 15px;
+  margin: 0;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pill.published {
+  background: #ecfdf3;
+  color: #16a34a;
+}
+
+.status-pill.draft {
+  background: #fef3c7;
+  color: #b45309;
+}
