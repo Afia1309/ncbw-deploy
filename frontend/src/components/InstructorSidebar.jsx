@@ -28,6 +28,10 @@ export default function InstructorSidebar() {
           <Link to="/instructor/profile" style={navItemStyle("/instructor/profile")}>
             Profile
           </Link>
+
+          <Link to="/instructor/notificationcenter" style={navItemStyle("/instructor/notificationcenter")}>
+            Notification Center
+          </Link>
         </nav>
       </div>
 
