@@ -1,0 +1,163 @@
+.instructor-profile-page {
+  max-width: 1220px;
+}
+
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 28px;
+}
+
+.profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  background: #c9a227;
+  color: #18324b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.profile-hero-text h1 {
+  margin: 0 0 8px 0;
+  color: #18324b;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.profile-hero-text p {
+  margin: 0 0 12px 0;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.profile-role-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #eee7d3;
+  color: #8b6b00;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.profile-card {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 24px;
+  padding: 30px 32px;
+  margin-bottom: 24px;
+}
+
+.profile-card h2 {
+  margin: 0 0 24px 0;
+  color: #18324b;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.profile-card-helper {
+  margin: -6px 0 26px 0;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.profile-info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-info-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.profile-info-row span {
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.profile-info-row strong {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.primary-profile-btn,
+.secondary-profile-btn {
+  height: 52px;
+  border-radius: 999px;
+  padding: 0 22px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.primary-profile-btn {
+  border: none;
+  background: #c9a227;
+  color: #18324b;
+}
+
+.primary-profile-btn:hover {
+  opacity: 0.94;
+}
+
+.secondary-profile-btn {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  color: #18324b;
+}
+
+.secondary-profile-btn:hover {
+  border-color: #c9a227;
+}
+
+@media (max-width: 900px) {
+  .profile-card {
+    padding: 24px;
+  }
+
+  .profile-info-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .profile-info-row strong {
+    text-align: left;
+  }
+}
+
+@media (max-width: 700px) {
+  .profile-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-hero-text h1 {
+    font-size: 26px;
+  }
+}
