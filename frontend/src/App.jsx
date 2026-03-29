@@ -22,7 +22,6 @@ import AdminProfile from "./pages/AdminProfile";
 import InstructorCourses from "./pages/InstructorCourses";
 import InstructorCourseDetail from "./pages/InstructorCourseDetail";
 import InstructorProfile from "./pages/InstructorProfile";
-import InstructorNotificationCenter from "./pages/InstructorNotificationCenter";
 import AdminFeedback from "./pages/AdminFeedback";
 import AdminReports from "./pages/AdminReports";
 
@@ -57,7 +56,6 @@ export default function App() {
         <Route path="/instructor/courses" element={<InstructorCourses />} />
         <Route path="/instructor/courses/:courseId" element={<InstructorCourseDetail />} />
         <Route path="/instructor/profile" element={<InstructorProfile />} />
-        <Route path="/instructor/notificationcenter" element={<InstructorNotificationCenter />} />
         <Route path="/admin/feedback" element={<AdminFeedback />} />
         <Route path="/admin/reports" element={<AdminReports />} />
       </Routes>
