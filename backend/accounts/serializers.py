@@ -82,6 +82,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         user = self.user
 
+        if user.profile.status != "active":
+            raise serializers.ValidationError("Your account is pending verification.")
+
         data["user"] = {
             "id": user.id,
             "username": user.username,
