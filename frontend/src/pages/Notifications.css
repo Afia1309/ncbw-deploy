@@ -11,12 +11,12 @@
 }
 
 .notifications-count {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   padding: 8px 14px;
   border-radius: 999px;
   background: rgba(212, 175, 55, 0.14);
-  color: #d4af37;
+  color: #7C6113;
   border: 1px solid rgba(212, 175, 55, 0.32);
 }
 
@@ -38,14 +38,14 @@
   padding: 18px 20px;
   border-radius: 18px;
   border: 1px solid rgba(212, 175, 55, 0.24);
-  background: #10294b;
+  background: #FFF8E8;
   transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
 .notification-item:hover {
   transform: translateY(-2px);
   border-color: rgba(212, 175, 55, 0.42);
-  background: #15345e;
+  background: #ECEEF3;
 }
 
 .notification-item.unread {
@@ -53,7 +53,7 @@
 }
 
 .notification-item.read {
-  opacity: 0.78;
+  opacity: 0.70;
 }
 
 .notification-left {
@@ -72,14 +72,14 @@
   margin: 0 0 6px;
   font-size: 16px;
   font-weight: 700;
-  color: #d4af37;
+  color: #15345e;
 }
 
 .notification-message {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
-  color: #f3df95;
+  color: #15345e;
 }
 
 .notification-btn {
@@ -102,7 +102,7 @@
 
 .notification-time {
   font-size: 12px;
-  color: #d9c27a;
+  color: #15345e;
   white-space: nowrap;
 }
 

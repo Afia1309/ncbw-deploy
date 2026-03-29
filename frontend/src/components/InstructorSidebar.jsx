@@ -1,7 +1,16 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function InstructorSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+
+    navigate("/login");
+  }
 
   const navItemStyle = (path) => ({
     display: "block",
@@ -35,7 +44,7 @@ export default function InstructorSidebar() {
         </nav>
       </div>
 
-      <button style={styles.signOut}>Sign Out</button>
+      <button style={styles.signOut} onClick={handleLogout}>Sign Out</button>
     </aside>
   );
 }
