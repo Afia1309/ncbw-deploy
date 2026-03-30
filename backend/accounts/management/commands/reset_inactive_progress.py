@@ -59,7 +59,6 @@ class Command(BaseCommand):
             is_active=True,
             profile__role='trainee',
             profile__inactivity_reminder_sent_at__isnull=False,
-            profile__inactivity_reminder_sent_at__lt=cutoff_date,
         )
 
         # No inactive users, exit early
@@ -71,28 +70,37 @@ class Command(BaseCommand):
 
         # Loop through each inactive user
         for user in inactive_users:
-            progress_qs = ModuleProgress.objects.filter(
-                # Only reset progress for incomplete modules
-                user=user,
-            ).exclude(status="completed")
+            #progress_qs = ModuleProgress.objects.filter(user=user).exclude(status="completed") # Only reset progress for incomplete modules
+            progress_qs = ModuleProgress.objects.filter(user=user, status="in_progress")
 
             if not progress_qs.exists():
                 continue  # User has no training progress to reset/User has finished training
 
+            reset_modules = []  # Track which modules were reset
+
             for progress in progress_qs:
                 total_resets += 1
 
+                module_name = str(progress.module)
+                reset_modules.append(module_name)
+
                 if dry_run:
                     self.stdout.write(
-                        f"[DRY RUN] Would reset progress: {user} → {progress.module}"
+                        f"[DRY RUN] Would reset progress: {user} -> {progress.module}"
                     )
                 else:
                     progress.reset_progress()
+
+                    progress.last_activity = timezone.now()
+                    progress.save(update_fields=["last_activity"])
+
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Reset progress: {user} → {progress.module}"
+                            f"Reset progress: {user} -> {progress.module}"
                         )
                     )
+
+            module_list = ", ".join(reset_modules)
 
             if not dry_run:
                 # Create notification (once per user)
@@ -100,7 +108,8 @@ class Command(BaseCommand):
                     user=user,
                     title="Training Progress Reset",
                     message=(
-                        "Your training progress has been reset due to 30 days of inactivity. "
+                        #"Your training progress has been reset due to 30 days of inactivity. "
+                        f"Your progress for the following modules has been reset due to inactivity: {module_list}.\n"
                         "Please log in to resume your assigned modules."
                     ),
                     notification_type="warning",
@@ -113,6 +122,7 @@ class Command(BaseCommand):
                     message=(
                         "Hello,\n\n"
                         "Your training progress has been reset due to 30 days of inactivity.\n"
+                        f"Affected modules: {module_list}\n"
                         "Please log in to resume your assigned modules.\n\n"
                         "Thank you."
                     ),

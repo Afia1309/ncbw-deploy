@@ -202,7 +202,7 @@ export default function CourseMaterial() {
               type="button"
               onClick={() => navigate(`/member/course/${module.id}`)}
             >
-              Back to Course
+              Back to Course Details
             </button>
           </div>
 

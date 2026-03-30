@@ -204,6 +204,10 @@ export default function CourseDisplay() {
             <button className="secondary-btn" type="button" onClick={openFeedbackModal}>
               Send Feedback
             </button>
+
+            <button className="secondary-btn" type="button" onClick={() => navigate(`/member/courses`)} style={{ marginLeft: "25px" }}>
+              Back to Courses 
+            </button>
           </div>
         </section>
 
