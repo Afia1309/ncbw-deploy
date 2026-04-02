@@ -28,17 +28,17 @@ export default function AdminLayout({ children }) {
           </Link>
 
           <Link
-            to="/admin/courses"
-            className={location.pathname.startsWith("/admin/courses") ? "active" : ""}
-          >
-            Courses
-          </Link>
-
-          <Link
             to="/admin/profile"
             className={location.pathname === "/admin/profile" ? "active" : ""}
           >
             Profile
+          </Link>
+
+          <Link
+            to="/admin/courses"
+            className={location.pathname.startsWith("/admin/courses") ? "active" : ""}
+          >
+            Courses
           </Link>
         </nav>
 
