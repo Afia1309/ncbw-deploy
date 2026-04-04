@@ -230,7 +230,7 @@ def password_reset_request(request):
 
     from django.conf import settings
     frontend_base_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:5173")
-    reset_url = f"{frontend_base_url}/reset-password?uid={uid}&token={token}"
+    reset_url = f"{frontend_base_url.rstrip('/')}/reset-password?uid={uid}&token={token}"
 
     subject = "Reset your NCBW Training Portal password"
     html_body = f"""
