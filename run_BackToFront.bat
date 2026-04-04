@@ -16,5 +16,9 @@ REM Start Frontend
 echo Starting Frontend...
 start cmd /k "cd frontend && npm run dev"
 
-echo All services started!
-pause
+REM Wait a few seconds for servers to start
+timeout /t 5 >nul
+
+REM Open browser tabs (default browser)
+start http://127.0.0.1:8000/admin/
+start http://localhost:5173
