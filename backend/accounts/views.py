@@ -478,7 +478,7 @@ class AdminInviteInstructorView(APIView):
             from django.conf import settings
             frontend_base_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3000")
 
-        activation_url = f"{frontend_base_url.rstrip('/')}/activate-account"
+        activation_url = f"{frontend_base_url.rstrip('/')}/signup"
 
         html_body = build_invite_email_html(name, member_id, "instructor", activation_url)
         text_body = build_invite_email_text(name, member_id, "instructor", activation_url)
