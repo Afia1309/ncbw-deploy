@@ -1,352 +1,655 @@
+from django.contrib.auth.models import User
 from django.utils import timezone
-from django.http import HttpResponse
-from django.core.mail import EmailMessage
-from django.utils import timezone
-from reportlab.pdfgen import canvas
+
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.contrib.auth.models import User
-import uuid
+from rest_framework.views import APIView
 
-from io import BytesIO
+from accounts.models import Course
+from accounts.serializers import CourseSerializer
+from notifications.models import Notification
+from notifications.utils import notify_trainee_course_assigned
 
-from .models import Enrollment, Module, ModuleProgress, Certificate
+from .models import (
+    CourseMemberAccess,
+    CoursePositionAccess,
+    Item,
+    ItemProgress,
+    Module,
+)
+from .serializers import (
+    CourseAudienceUpdateSerializer,
+    InstructorCourseDetailSerializer,
+    ItemProgressSerializer,
+    ItemSerializer,
+    ItemWriteSerializer,
+    ModuleWriteSerializer,
+    TraineeModuleSerializer,
+)
+
+
+def get_member_id(user):
+    if hasattr(user, "profile") and user.profile.member_id:
+        return user.profile.member_id
+    return user.username
+
+
+def is_admin(user):
+    return bool(
+        user.is_authenticated
+        and hasattr(user, "profile")
+        and user.profile.role == "admin"
+    )
+
+
+def can_manage_course(user, course):
+    return is_admin(user) or course.instructor_id == user.id
+
+
+def course_matches_user(course, user):
+    if not hasattr(user, "profile"):
+        return False
+
+    position_targets = list(course.position_targets.values_list("position", flat=True))
+    member_target_ids = list(course.member_targets.values_list("user_id", flat=True))
+
+    if not position_targets and not member_target_ids:
+        return False
+
+    if user.id in member_target_ids:
+        return True
+
+    return user.profile.position in position_targets
+
+
+def item_matches_user(item, user):
+    if item.audience_type == "all":
+        return True
+
+    if not hasattr(user, "profile"):
+        return False
+
+    if item.audience_type == "role":
+        positions = list(item.position_targets.values_list("position", flat=True))
+        return user.profile.position in positions
+
+    if item.audience_type == "member":
+        member_user_ids = list(item.member_targets.values_list("user_id", flat=True))
+        return user.id in member_user_ids
+
+    return False
+
+
+def visible_items_for_user(course, user):
+    items = []
+    modules = course.modules.filter(is_visible=True).prefetch_related(
+        "items__position_targets",
+        "items__member_targets",
+    )
+    for module in modules:
+        for item in module.items.filter(is_visible=True).order_by("order", "id"):
+            if item_matches_user(item, user):
+                items.append(item)
+    return items
+
+
+def build_progress_summary_for_items(items, user):
+    total = len(items)
+    if total == 0:
+        return {
+            "completed": 0,
+            "total": 0,
+            "percent": 0,
+            "status": "not_started",
+        }
+
+    item_ids = [item.id for item in items]
+    progress_rows = ItemProgress.objects.filter(
+        user=user,
+        item_id__in=item_ids,
+    )
+
+    progress_map = {row.item_id: row.status for row in progress_rows}
+    completed = sum(1 for item_id in item_ids if progress_map.get(item_id) == "completed")
+    has_in_progress = any(progress_map.get(item_id) == "in_progress" for item_id in item_ids)
+
+    percent = round((completed / total) * 100) if total else 0
+
+    if completed == total:
+        status_value = "completed"
+    elif completed > 0 or has_in_progress:
+        status_value = "in_progress"
+    else:
+        status_value = "not_started"
+
+    return {
+        "completed": completed,
+        "total": total,
+        "percent": percent,
+        "status": status_value,
+    }
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
     u = request.user
+    profile = getattr(u, "profile", None)
 
-    name = u.get_full_name() or u.username
-    member_id = u.username
-    
-    # Get profile data if it exists
-    email = u.email
-    phone = ""
-    position = "General Member"
-    role = "trainee"
-    
-    if hasattr(u, 'profile'):
-        member_id = u.profile.member_id or u.username
-        phone = u.profile.phone or ""
-        position = u.profile.position or "General Member"
-        role = u.profile.role or "trainee"
-
-    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
-    track_name = enrollment.track.name if enrollment else "Leadership Track"
-    phase = enrollment.phase if enrollment else "Phase 1"
-    cohort = enrollment.cohort if enrollment else "2026"
-
-    return Response({
-        "name": name,
-        "member_id": str(member_id),
-        "email": email,
-        "phone": phone,
-        "position": position,
-        "role": role,
-        "track": track_name,
-        "phase": phase,
-        "cohort": cohort,
-    })
+    return Response(
+        {
+            "name": u.get_full_name().strip() or u.username,
+            "member_id": get_member_id(u),
+            "email": u.email,
+            "phone": profile.phone if profile else "",
+            "position": profile.position if profile else "General Member",
+            "role": profile.role if profile else "trainee",
+        }
+    )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def dashboard(request):
-    u = request.user
+class InstructorCourseListView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    # Get member_id from profile if it exists
-    member_id = u.username
-    role = "trainee"
-    if hasattr(u, 'profile'):
-        member_id = u.profile.member_id or u.username
-        role = u.profile.role
+    def get(self, request):
+        if not hasattr(request.user, "profile") or request.user.profile.role not in ["instructor", "admin"]:
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
 
-    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
-    if not enrollment:
-        return Response({"detail": "User is not enrolled in a track."}, status=400)
+        if is_admin(request.user):
+            courses = Course.objects.select_related("instructor").all()
+        else:
+            courses = Course.objects.select_related("instructor").filter(instructor=request.user)
 
-    track = enrollment.track
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data)
 
-    modules_qs = Module.objects.filter(track=track).order_by("order")
-    
-    for module in modules_qs:
-        ModuleProgress.objects.get_or_create(
-            user=u,
-            module=module,
-            defaults={"status": "not_started"}
+
+class InstructorCourseDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_course(self, course_id):
+        return Course.objects.select_related("instructor").prefetch_related(
+            "modules__items__position_targets",
+            "modules__items__member_targets",
+            "position_targets",
+            "member_targets__user__profile",
+        ).get(id=course_id)
+
+    def get(self, request, course_id):
+        try:
+            course = self.get_course(course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        trainees = User.objects.filter(
+            profile__role="trainee",
+            profile__status="active",
         )
+        enrollment_count = sum(1 for trainee in trainees if course_matches_user(course, trainee))
 
-    progress_rows = ModuleProgress.objects.filter(user=u, module__track=track)
-    progress_map = {p.module_id: p for p in progress_rows}
+        serializer = InstructorCourseDetailSerializer(
+            course,
+            context={"enrollment_count": enrollment_count, "request": request},
+        )
+        return Response(serializer.data)
 
-    required_total = 0
-    required_completed = 0
+    def patch(self, request, course_id):
+        try:
+            course = self.get_course(course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    modules_out = []
-    lock_next = False
+        if not can_manage_course(request.user, course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
 
-    for m in modules_qs:
-        p = progress_map.get(m.id)
+        allowed_fields = ["name", "code", "description", "image", "open_date", "due_date", "status"]
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(course, field, request.data.get(field))
+        course.save()
 
-        status = p.status if p else "not_started"
-        last_activity = p.last_activity.isoformat() if (p and p.last_activity) else None
+        selected_roles = request.data.get("selected_roles", request.data.get("selectedRoles"))
+        assigned_member_ids = request.data.get("assigned_member_ids", request.data.get("assignedMemberIds"))
 
-        if m.required:
-            required_total += 1
-            if status == "completed":
-                required_completed += 1
+        if selected_roles is not None:
+            selected_roles = list(dict.fromkeys(selected_roles))
+            CoursePositionAccess.objects.filter(course=course).exclude(position__in=selected_roles).delete()
+            existing_positions = set(
+                CoursePositionAccess.objects.filter(course=course).values_list("position", flat=True)
+            )
+            for position in selected_roles:
+                if position not in existing_positions:
+                    CoursePositionAccess.objects.create(course=course, position=position)
 
-        modules_out.append({
-            "id": m.id,
-            "title": m.title,
-            "required": m.required,
-            "status": status,
-            "due_date": m.due_date.isoformat() if m.due_date else None,
-            "last_activity": last_activity,
-            "locked": lock_next,
+        if assigned_member_ids is not None:
+            users = User.objects.filter(profile__member_id__in=assigned_member_ids)
+            CourseMemberAccess.objects.filter(course=course).exclude(user__in=users).delete()
+            existing_user_ids = set(
+                CourseMemberAccess.objects.filter(course=course).values_list("user_id", flat=True)
+            )
+            for user in users:
+                if user.id not in existing_user_ids:
+                    CourseMemberAccess.objects.create(course=course, user=user)
+
+        # Notify all currently assigned trainees (idempotent — skips anyone already notified)
+        if course.status == "Published" and (selected_roles is not None or assigned_member_ids is not None):
+            trainees = User.objects.filter(
+                profile__role="trainee",
+                profile__status="active",
+            ).select_related("profile")
+            for trainee in trainees:
+                if course_matches_user(course, trainee):
+                    try:
+                        notify_trainee_course_assigned(trainee, course)
+                    except Exception:
+                        pass
+
+        serializer = InstructorCourseDetailSerializer(
+            course,
+            context={"enrollment_count": 0, "request": request},
+        )
+        return Response({
+            "message": "Course updated successfully.",
+            "course": serializer.data,
         })
 
-        # lock everything after first required incomplete module
-        if m.required and status != "completed":
-            lock_next = True
 
-    progress_pct = int(round((required_completed / required_total) * 100)) if required_total else 0
-    certificate_eligible = required_total > 0 and required_completed == required_total
+class InstructorEnrollmentView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    return Response({
-        "user": {
-            "name": u.get_full_name() or u.username,
-            "member_id": str(member_id),
-            "role": role,
-        },
-        "program": {
-            "track": track.name,
-            "phase": enrollment.phase,
-            "cohort": enrollment.cohort,
-        },
-        "progress": {
-            "percent_complete": progress_pct,
-            "completed_required": required_completed,
-            "total_required": required_total,
-            "certificate_eligible": certificate_eligible,
-        },
-        "required_modules": modules_out,
-    })
+    def get(self, request, course_id):
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        search = request.query_params.get("search", "").strip().lower()
+        sort = request.query_params.get("sort", "default")
+
+        trainees = User.objects.filter(
+            profile__role="trainee",
+            profile__status="active",
+        ).select_related("profile")
+
+        rows = []
+        for trainee in trainees:
+            if not course_matches_user(course, trainee):
+                continue
+
+            progress_summary = build_progress_summary_for_items(
+                visible_items_for_user(course, trainee),
+                trainee,
+            )
+
+            row = {
+                "id": trainee.id,
+                "name": trainee.get_full_name() or trainee.username,
+                "memberId": get_member_id(trainee),
+                "role": trainee.profile.position,
+                "progress": progress_summary["percent"],
+                "status": progress_summary["status"].replace("_", " ").title(),
+                "enrollmentDate": trainee.profile.activated_at.date().isoformat() if trainee.profile.activated_at else "",
+            }
+            rows.append(row)
+
+        if search:
+            rows = [
+                row for row in rows
+                if search in row["name"].lower()
+                or search in row["memberId"].lower()
+                or search in row["role"].lower()
+                or search in row["status"].lower()
+                or search in row["enrollmentDate"].lower()
+            ]
+
+        if sort == "date-newest":
+            rows.sort(key=lambda x: x["enrollmentDate"], reverse=True)
+        elif sort == "date-oldest":
+            rows.sort(key=lambda x: x["enrollmentDate"])
+
+        return Response(rows)
+
+
+class InstructorModuleCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, course_id):
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data.copy()
+        data["course"] = course.id
+
+        if not data.get("order"):
+            last_module = Module.objects.filter(course=course).order_by("-order").first()
+            data["order"] = (last_module.order + 1) if last_module else 1
+
+        serializer = ModuleWriteSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        module = serializer.save()
+
+        return Response(
+            {
+                "message": "Module created successfully.",
+                "module": {
+                    "id": module.id,
+                    "title": module.title,
+                    "visible": module.is_visible,
+                    "isExpanded": True,
+                    "created_at": module.created_at,
+                    "items": [],
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InstructorModuleDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, module_id):
+        return Module.objects.select_related("course").get(id=module_id)
+
+    def patch(self, request, module_id):
+        try:
+            module = self.get_object(module_id)
+        except Module.DoesNotExist:
+            return Response({"detail": "Module not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, module.course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ModuleWriteSerializer(module, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        module = serializer.save()
+
+        return Response({
+            "message": "Module updated successfully.",
+            "module": {
+                "id": module.id,
+                "title": module.title,
+                "visible": module.is_visible,
+                "order": module.order,
+            },
+        })
+
+    def delete(self, request, module_id):
+        try:
+            module = self.get_object(module_id)
+        except Module.DoesNotExist:
+            return Response({"detail": "Module not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, module.course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        module.delete()
+        return Response({"message": "Module deleted successfully."})
+
+
+class InstructorItemCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request, module_id):
+        try:
+            module = Module.objects.select_related("course").get(id=module_id)
+        except Module.DoesNotExist:
+            return Response({"detail": "Module not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, module.course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data.copy()
+        data["module"] = module.id
+
+        if not data.get("order"):
+            last_item = Item.objects.filter(module=module).order_by("-order").first()
+            data["order"] = (last_item.order + 1) if last_item else 1
+
+        serializer = ItemWriteSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save()
+
+        return Response(
+            {
+                "message": "Item created successfully.",
+                "item": ItemSerializer(item, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InstructorItemDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_object(self, item_id):
+        return Item.objects.select_related("module__course").get(id=item_id)
+
+    def patch(self, request, item_id):
+        try:
+            item = self.get_object(item_id)
+        except Item.DoesNotExist:
+            return Response({"detail": "Item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, item.module.course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ItemWriteSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save()
+
+        return Response({
+            "message": "Item updated successfully.",
+            "item": ItemSerializer(item, context={"request": request}).data,
+        })
+
+    def delete(self, request, item_id):
+        try:
+            item = self.get_object(item_id)
+        except Item.DoesNotExist:
+            return Response({"detail": "Item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, item.module.course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        item.delete()
+        return Response({"message": "Item deleted successfully."})
+
+
+class TraineeCourseListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, "profile") or request.user.profile.role not in ["trainee", "admin"]:
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check and create due-date notifications for this trainee
+        if request.user.profile.role == "trainee":
+            try:
+                from notifications.utils import check_due_date_notifications
+                check_due_date_notifications(request.user)
+            except Exception:
+                pass
+
+        courses = Course.objects.filter(status="Published").select_related("instructor").prefetch_related(
+            "position_targets",
+            "member_targets",
+            "modules__items__position_targets",
+            "modules__items__member_targets",
+        )
+
+        visible_courses = []
+        for course in courses:
+            if course_matches_user(course, request.user) or is_admin(request.user):
+                visible_courses.append(course)
+
+        serialized = CourseSerializer(visible_courses, many=True).data
+        response_rows = []
+
+        for course, row in zip(visible_courses, serialized):
+            visible_items = visible_items_for_user(course, request.user)
+            progress_summary = build_progress_summary_for_items(visible_items, request.user)
+
+            row["progress"] = progress_summary
+            response_rows.append(row)
+
+        return Response(response_rows)
+
+
+class TraineeCourseDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, course_id):
+        try:
+            course = Course.objects.select_related("instructor").prefetch_related(
+                "modules__items__position_targets",
+                "modules__items__member_targets",
+            ).get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if course.status != "Published" and not is_admin(request.user):
+            return Response({"detail": "Course is not available."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not (course_matches_user(course, request.user) or is_admin(request.user)):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        visible_items = visible_items_for_user(course, request.user)
+        progress_rows = ItemProgress.objects.filter(
+            user=request.user,
+            item_id__in=[item.id for item in visible_items],
+        )
+        progress_map = {row.item_id: row.status for row in progress_rows}
+
+        modules = course.modules.filter(is_visible=True).order_by("order", "id")
+        modules_data = TraineeModuleSerializer(
+            modules,
+            many=True,
+            context={
+                "request": request,
+                "user": request.user,
+                "progress_map": progress_map,
+                "item_matcher": item_matches_user,
+            },
+        ).data
+
+        progress_summary = build_progress_summary_for_items(visible_items, request.user)
+        instructor_name = f"{course.instructor.first_name} {course.instructor.last_name}".strip() or course.instructor.username
+
+        return Response({
+            "id": course.id,
+            "title": course.name,
+            "code": course.code,
+            "description": course.description,
+            "image": course.image,
+            "status": course.status,
+            "open_date": course.open_date,
+            "due_date": course.due_date,
+            "instructor_name": instructor_name,
+            "progress": progress_summary,
+            "modules": modules_data,
+        })
+
+
+class InstructorNotifyView(APIView):
+    """
+    POST /api/training/instructor/courses/<course_id>/notify/
+    Sends a notification to all enrolled members of the course.
+    Body: { title, message, notification_type (optional, default "info") }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, course_id):
+        if not hasattr(request.user, "profile") or request.user.profile.role not in ["instructor", "admin"]:
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_manage_course(request.user, course):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        title = (request.data.get("title") or "").strip()
+        message = (request.data.get("message") or "").strip()
+        notification_type = request.data.get("notification_type", "info")
+
+        if not title or not message:
+            return Response({"detail": "title and message are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_types = [t[0] for t in Notification.NOTIFICATION_TYPES]
+        if notification_type not in valid_types:
+            notification_type = "info"
+
+        # Find all active trainees enrolled in this course
+        trainees = User.objects.filter(
+            profile__role="trainee",
+            profile__status="active",
+        ).select_related("profile")
+
+        enrolled = [u for u in trainees if course_matches_user(course, u)]
+
+        notifications = [
+            Notification(
+                user=u,
+                course=course,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+            )
+            for u in enrolled
+        ]
+        Notification.objects.bulk_create(notifications)
+
+        return Response({"sent_to": len(enrolled)}, status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def update_module_status(request, module_id):
-  
-    u = request.user
-    status = request.data.get("status")
+def update_item_progress(request, item_id):
+    try:
+        item = Item.objects.select_related("module__course").get(id=item_id)
+    except Item.DoesNotExist:
+        return Response({"detail": "Item not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    if status not in ("not_started", "in_progress", "completed"):
-        return Response({"detail": "Invalid status"}, status=400)
+    course = item.module.course
 
-    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
-    if not enrollment:
-        return Response({"detail": "User is not enrolled in a track."}, status=400)
+    if not (course_matches_user(course, request.user) or is_admin(request.user)):
+        return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
 
-    module = Module.objects.filter(id=module_id, track=enrollment.track).first()
-    if not module:
-        return Response({"detail": "Module not found"}, status=404)
+    if not item_matches_user(item, request.user):
+        return Response({"detail": "Not allowed for this item."}, status=status.HTTP_403_FORBIDDEN)
 
-    obj, _ = ModuleProgress.objects.get_or_create(user=u, module=module)
-    obj.status = status
-    obj.last_activity = timezone.now()
+    serializer = ItemProgressSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
 
-    obj.save()
+    status_value = serializer.validated_data["status"]
 
-    if status == "completed":
-        obj.completed_at = timezone.now()
-    else:
-        obj.completed_at = None
-
-    obj.save()
-    return Response({"ok": True})
-
-
-def user_completed_required_modules(user, track):
-    required_modules = Module.objects.filter(track=track, required=True)
-    total_required = required_modules.count()
-
-    if total_required == 0:
-        return False
-
-    completed_required = ModuleProgress.objects.filter(
-        user=user,
-        module__track=track,
-        module__required=True,
-        status="completed"
-    ).count()
-
-    return completed_required == total_required
-
-def build_certificate_pdf_bytes(user, track, issued_date, certificate_code):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-
-    p.setTitle("Certificate of Completion")
-
-    p.setFont("Helvetica-Bold", 22)
-    p.drawCentredString(300, 750, "Certificate of Completion")
-
-    p.setFont("Helvetica", 14)
-    p.drawCentredString(300, 710, "This certifies that")
-
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(300, 675, user.get_full_name() or user.username)
-
-    p.setFont("Helvetica", 14)
-    p.drawCentredString(300, 635, "has successfully completed the")
-
-    p.setFont("Helvetica-Bold", 16)
-    p.drawCentredString(300, 600, track.name)
-
-    p.setFont("Helvetica", 12)
-    p.drawCentredString(300, 555, f"Issued Date: {issued_date}")
-    p.drawCentredString(300, 530, f"Certificate Code: {certificate_code}")
-
-    p.showPage()
-    p.save()
-
-    buffer.seek(0)
-    return buffer.read()
-
-
-def email_certificate_if_ready(user, track):
-    if not user_completed_required_modules(user, track):
-        return
-
-    certificate, _ = Certificate.objects.get_or_create(
-        user=user,
-        track=track,
-        defaults={
-            "certificate_code": f"CERT-{uuid.uuid4().hex[:10].upper()}"
-        }
-    )
-
-    if certificate.emailed_at:
-        return
-
-    if not user.email:
-        return
-
-    pdf_bytes = build_certificate_pdf_bytes(
-        user=user,
-        track=track,
-        issued_date=certificate.issued_date,
-        certificate_code=certificate.certificate_code,
-    )
-
-    email = EmailMessage(
-        subject="Your Certificate of Completion",
-        body=(
-            f"Hello {user.get_full_name() or user.username},\n\n"
-            f"Congratulations on completing the {track.name} track.\n"
-            "Your certificate of completion is attached as a PDF.\n"
-        ),
-        to=[user.email],
-    )
-
-    email.attach("certificate.pdf", pdf_bytes, "application/pdf")
-    email.send(fail_silently=False)
-
-    certificate.emailed_at = timezone.now()
-    certificate.save(update_fields=["emailed_at"])
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def my_certificate(request):
-    u = request.user
-
-    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
-    if not enrollment:
-        return Response({"detail": "User is not enrolled in a track."}, status=400)
-
-    track = enrollment.track
-
-    if not user_completed_required_modules(u, track):
-        return Response(
-            {
-                "eligible": False,
-                "detail": "User has not completed all required modules."
-            },
-            status=400
-        )
-
-    certificate, created = Certificate.objects.get_or_create(
-        user=u,
-        track=track,
-        defaults={
-            "certificate_code": f"CERT-{uuid.uuid4().hex[:10].upper()}"
-        }
-    )
+    progress, _ = ItemProgress.objects.get_or_create(user=request.user, item=item)
+    progress.status = status_value
+    progress.last_activity = timezone.now()
+    progress.completed_at = timezone.now() if status_value == "completed" else None
+    progress.save()
 
     return Response({
-        "eligible": True,
-        "certificate": {
-            "id": certificate.id,
-            "user": u.get_full_name() or u.username,
-            "member_id": getattr(u.profile, "member_id", u.username) if hasattr(u, "profile") else u.username,
-            "track": track.name,
-            "issued_date": str(certificate.issued_date),
-            "certificate_code": certificate.certificate_code,
-        }
+        "ok": True,
+        "item_id": item.id,
+        "status": progress.status,
+        "completed_at": progress.completed_at,
     })
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def certificate_pdf(request):
-    u = request.user
-
-    enrollment = Enrollment.objects.filter(user=u).select_related("track").first()
-    if not enrollment:
-        return Response({"detail": "User is not enrolled in a track."}, status=400)
-
-    track = enrollment.track
-
-    if not user_completed_required_modules(u, track):
-        return Response({"detail": "Not eligible for certificate."}, status=400)
-
-    certificate, _ = Certificate.objects.get_or_create(
-        user=u,
-        track=track,
-        defaults={
-            "certificate_code": f"CERT-{uuid.uuid4().hex[:10].upper()}"
-        }
-    )
-
-    response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="certificate.pdf"'
-
-    p = canvas.Canvas(response)
-    p.setTitle("Certificate of Completion")
-
-    p.setFont("Helvetica-Bold", 22)
-    p.drawCentredString(300, 750, "Certificate of Completion")
-
-    p.setFont("Helvetica", 14)
-    p.drawCentredString(300, 710, "This certifies that")
-
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(300, 675, u.get_full_name() or u.username)
-
-    p.setFont("Helvetica", 14)
-    p.drawCentredString(300, 635, "has successfully completed the")
-
-    p.setFont("Helvetica-Bold", 16)
-    p.drawCentredString(300, 600, track.name)
-
-    p.setFont("Helvetica", 12)
-    p.drawCentredString(300, 555, f"Issued Date: {certificate.issued_date}")
-    p.drawCentredString(300, 530, f"Certificate Code: {certificate.certificate_code}")
-
-    p.showPage()
-    p.save()
-
-    return response

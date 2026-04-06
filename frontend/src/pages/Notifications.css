@@ -1,119 +1,340 @@
-.notifications-card {
+/* ── Page ─────────────────────────────────────────────────────────────────── */
+
+.ntf-page {
+  max-width: 720px;
+}
+
+.ntf-header {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.notifications-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.notifications-count {
-  font-size: 13px;
-  font-weight: 700;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(212, 175, 55, 0.14);
-  color: #d4af37;
-  border: 1px solid rgba(212, 175, 55, 0.32);
-}
-
-.notifications-empty {
-  min-height: 92px;
-}
-
-.notifications-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.notification-item {
-  display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 24px;
-  padding: 18px 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(212, 175, 55, 0.24);
-  background: #10294b;
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
-.notification-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(212, 175, 55, 0.42);
-  background: #15345e;
+.ntf-title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #18324b;
 }
 
-.notification-item.unread {
-  border-left: 4px solid #d4af37;
-}
-
-.notification-item.read {
-  opacity: 0.78;
-}
-
-.notification-left {
-  flex: 1;
-}
-
-.notification-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  min-width: 160px;
-}
-
-.notification-title {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #d4af37;
-}
-
-.notification-message {
+.ntf-subtitle {
   margin: 0;
   font-size: 14px;
-  line-height: 1.6;
-  color: #f3df95;
+  color: #6b7280;
 }
 
-.notification-btn {
-  border-radius: 999px;
-  border: 1px solid rgba(212, 175, 55, 0.42);
-  padding: 10px 16px;
-  background: #d4af37;
-  color: #0b1f3a;
+/* ── Mark all button ─────────────────────────────────────────────────────── */
+
+.ntf-markall-btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  border-radius: 8px;
+  padding: 8px 16px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: transform 0.18s ease, filter 0.18s ease;
+  transition: background 0.12s;
 }
 
-.notification-btn:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.03);
+.ntf-markall-btn:hover:not(:disabled) {
+  background: #f9fafb;
 }
 
-.notification-time {
-  font-size: 12px;
-  color: #d9c27a;
+.ntf-markall-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+
+.ntf-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.ntf-filter-btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.ntf-filter-btn:hover {
+  background: #f9fafb;
+}
+
+.ntf-filter-btn--active {
+  background: #18324b;
+  border-color: #18324b;
+  color: #fff;
+}
+
+.ntf-filter-count {
+  background: #ef4444;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── List ────────────────────────────────────────────────────────────────── */
+
+.ntf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Row ─────────────────────────────────────────────────────────────────── */
+
+.ntf-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+
+.ntf-row:hover {
+  box-shadow: 0 2px 10px rgba(17, 24, 39, 0.06);
+  border-color: #d1d5db;
+}
+
+.ntf-row--read {
+  background: #fafafa;
+  opacity: 0.85;
+}
+
+.ntf-row--unread {
+  background: #fff;
+}
+
+.ntf-row__dot-col {
+  width: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 5px;
+  flex-shrink: 0;
+}
+
+.ntf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
+}
+
+.ntf-row__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ntf-row__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.ntf-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-@media (max-width: 768px) {
-  .notification-item {
-    flex-direction: column;
-  }
+.ntf-row__course {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
 
-  .notification-right {
-    min-width: 0;
+.ntf-row__time {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.ntf-row__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.ntf-row__preview {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ── Mark read button ────────────────────────────────────────────────────── */
+
+.ntf-mark-btn {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+  transition: background 0.1s, color 0.1s;
+}
+
+.ntf-mark-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.ntf-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* ── Full message modal ──────────────────────────────────────────────────── */
+
+.ntf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.ntf-modal {
+  background: #fff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  padding: 24px 28px 28px;
+}
+
+.ntf-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ntf-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #9ca3af;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.ntf-modal-close:hover {
+  color: #374151;
+}
+
+.ntf-modal-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.ntf-modal-course {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.ntf-modal-message {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.7;
+  margin: 0 0 20px;
+  white-space: pre-wrap;
+}
+
+.ntf-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 14px;
+  flex-wrap: wrap;
+}
+
+.ntf-modal-time {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.ntf-go-btn {
+  background: #18324b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ntf-go-btn:hover {
+  background: #142c5c;
+}
+
+@media (max-width: 600px) {
+  .ntf-row__time {
+    margin-left: 0;
     width: 100%;
-    align-items: flex-start;
   }
 }

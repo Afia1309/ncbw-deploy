@@ -99,10 +99,128 @@
   text-align: right;
 }
 
+.profile-actions-card {
+  padding: 24px 32px;
+}
+
+.profile-actions-card h2 {
+  margin-bottom: 16px;
+}
+
 .profile-actions {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+
+.ip-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.ip-modal {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+  overflow: hidden;
+}
+
+.ip-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 28px 0;
+}
+
+.ip-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #18324b;
+}
+
+.ip-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #9ca3af;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.ip-modal-close:hover {
+  color: #374151;
+}
+
+.ip-modal-form {
+  padding: 20px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ip-modal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ip-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ip-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ip-input {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #111827;
+  outline: none;
+  transition: border-color 0.12s;
+  font-family: inherit;
+}
+
+.ip-input:focus {
+  border-color: #18324b;
+}
+
+.ip-field-error {
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.ip-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.ip-success {
+  padding: 20px 28px 28px;
+  color: #16a34a;
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0;
 }
 
 .primary-profile-btn,

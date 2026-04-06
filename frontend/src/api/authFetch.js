@@ -14,8 +14,9 @@ export async function authFetch(url, options = {}) {
     const refresh = localStorage.getItem("refresh_token");
 
     // ask backend for new access token
+    const BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
     const refreshRes = await fetch(
-      "http://127.0.0.1:8000/api/token/refresh/",
+      `${BASE}/api/token/refresh/`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

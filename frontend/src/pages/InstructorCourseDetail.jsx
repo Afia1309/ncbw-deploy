@@ -1,37 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import InstructorLayout from "../components/InstructorLayout";
 import "./InstructorCourseDetail.css";
 
-const students = [
-  {
-    id: 1,
-    name: "Ava Johnson",
-    memberId: "N10024567",
-    role: "President",
-    progress: 85,
-    status: "In Progress",
-    enrollmentDate: "2026-01-12",
-  },
-  {
-    id: 2,
-    name: "Nia Thompson",
-    memberId: "N10024568",
-    role: "Vice President",
-    progress: 100,
-    status: "Completed",
-    enrollmentDate: "2026-01-18",
-  },
-  {
-    id: 3,
-    name: "Maya Carter",
-    memberId: "N10024569",
-    role: "General Member",
-    progress: 42,
-    status: "In Progress",
-    enrollmentDate: "2026-02-03",
-  },
-];
-
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/api/training`;
 const roleOptions = [
   "President",
   "Vice President",
@@ -42,113 +14,131 @@ const roleOptions = [
   "General Member",
 ];
 
-const nowIso = () => new Date().toISOString();
+const labelToBackendType = {
+  PDF: "pdf",
+  Video: "video",
+  "External Video": "external_video",
+  Quiz: "quiz",
+  "Text Content": "text",
+  Link: "link",
+};
+
+const backendTypeToLabel = {
+  pdf: "PDF",
+  video: "Video",
+  external_video: "External Video",
+  quiz: "Quiz",
+  text: "Text Content",
+  link: "Link",
+};
+
+const nowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const createBlankQuestion = () => ({
-  id: Date.now() + Math.random(),
+  id: nowId(),
   prompt: "",
   points: 1,
   options: [
-    { id: Date.now() + Math.random() + 1, text: "" },
-    { id: Date.now() + Math.random() + 2, text: "" },
-    { id: Date.now() + Math.random() + 3, text: "" },
-    { id: Date.now() + Math.random() + 4, text: "" },
+    { id: nowId(), text: "" },
+    { id: nowId(), text: "" },
+    { id: nowId(), text: "" },
+    { id: nowId(), text: "" },
   ],
   correctOptionId: null,
 });
 
-const initialModules = [
-  {
-    id: 1,
-    title: "Module 1: Welcome and Orientation",
-    visible: true,
-    isExpanded: true,
-    createdAt: "2026-03-20T10:00:00.000Z",
-    items: [
-      {
-        id: 1,
-        type: "PDF",
-        title: "Program Handbook",
-        visible: true,
-        createdAt: "2026-03-20T10:20:00.000Z",
-        fileName: "program-handbook.pdf",
-      },
-      {
-        id: 2,
-        type: "External Video",
-        title: "Welcome Video Link",
-        visible: true,
-        createdAt: "2026-03-20T11:00:00.000Z",
-        externalUrl: "https://example.com/welcome-video",
-      },
-    ],
-  },
-  {
-    id: 2,
-    title: "Module 2: Leadership Foundations",
-    visible: false,
-    isExpanded: false,
-    createdAt: "2026-03-24T09:30:00.000Z",
-    items: [
-      {
-        id: 3,
-        type: "Quiz",
-        title: "Leadership Foundations Quiz",
-        visible: false,
-        createdAt: "2026-03-24T10:00:00.000Z",
-        audienceType: "role",
-        audienceRoles: ["Vice President"],
-        quiz: {
-          autoGrade: true,
-          passingGrade: 70,
-          questions: [
-            {
-              id: 1,
-              prompt: "Which quality is most important in servant leadership?",
-              points: 5,
-              options: [
-                { id: 1, text: "Control" },
-                { id: 2, text: "Listening" },
-                { id: 3, text: "Status" },
-                { id: 4, text: "Titles" },
-              ],
-              correctOptionId: 2,
-            },
+const normalizeQuizQuestions = (quiz) => {
+  if (!quiz || !Array.isArray(quiz.questions) || quiz.questions.length === 0) {
+    return [createBlankQuestion()];
+  }
+
+  return quiz.questions.map((question) => ({
+    id: question.id || nowId(),
+    prompt: question.prompt || "",
+    points: question.points ?? 1,
+    options:
+      Array.isArray(question.options) && question.options.length > 0
+        ? question.options.map((option) => ({
+            id: option.id || nowId(),
+            text: option.text || "",
+          }))
+        : [
+            { id: nowId(), text: "" },
+            { id: nowId(), text: "" },
+            { id: nowId(), text: "" },
+            { id: nowId(), text: "" },
           ],
-          totalPoints: 5,
-        },
-      },
-    ],
-  },
-];
+    correctOptionId: question.correctOptionId ?? null,
+  }));
+};
+
+const calculateQuizTotalPoints = (questions) =>
+  questions.reduce((sum, question) => sum + Number(question.points || 0), 0);
+
+const getToken = () => 
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    "";
+
+async function fetchWithAuth(url, options = {}) {
+  const token = getToken();
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    let errorMessage = "Request failed.";
+    try {
+      const errorData = await response.json();
+      errorMessage = JSON.stringify(errorData);
+    } catch {
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
 
 export default function InstructorCourseDetail() {
+  const { courseId } = useParams();
+  const id = courseId;
+
   const [activeTab, setActiveTab] = useState("Overview");
-  const [courseStatus, setCourseStatus] = useState("Draft");
 
-  const [selectedRoles, setSelectedRoles] = useState([
-    "President",
-    "Vice President",
-    "Treasurer",
-    "Secretary",
-    "Chaplain",
-    "Parliamentarian",
-  ]);
+  const [course, setCourse] = useState(null);
+  const [modules, setModules] = useState([]);
+  const [enrollmentRows, setEnrollmentRows] = useState([]);
+
+  const [loadingCourse, setLoadingCourse] = useState(true);
+  const [loadingEnrollment, setLoadingEnrollment] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const [expandedModules, setExpandedModules] = useState({});
+
+  const [visibilityLocked, setVisibilityLocked] = useState(true);
+  const [selectedRoles, setSelectedRoles] = useState([]);
   const [memberIdInput, setMemberIdInput] = useState("");
-  const [assignedMemberIds, setAssignedMemberIds] = useState(["N10024567", "N10024592"]);
-  const [isVisibilitySaved, setIsVisibilitySaved] = useState(false);
-
-  const [modules, setModules] = useState(initialModules);
-
-  const [showAddModuleModal, setShowAddModuleModal] = useState(false);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [selectedModuleId, setSelectedModuleId] = useState(null);
+  const [assignedMemberIds, setAssignedMemberIds] = useState([]);
 
   const [editingModuleId, setEditingModuleId] = useState(null);
   const [editingModuleTitle, setEditingModuleTitle] = useState("");
 
+  const [showAddModuleModal, setShowAddModuleModal] = useState(false);
   const [newModuleTitle, setNewModuleTitle] = useState("");
   const [newModuleVisible, setNewModuleVisible] = useState(true);
+
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [itemModalMode, setItemModalMode] = useState("create");
+  const [selectedModuleId, setSelectedModuleId] = useState(null);
+  const [editingItemId, setEditingItemId] = useState(null);
 
   const [newItemTitle, setNewItemTitle] = useState("");
   const [newItemType, setNewItemType] = useState("PDF");
@@ -160,9 +150,10 @@ export default function InstructorCourseDetail() {
   const [newItemAudienceMemberIds, setNewItemAudienceMemberIds] = useState([]);
 
   const [newItemFile, setNewItemFile] = useState(null);
+  const [existingFileName, setExistingFileName] = useState("");
   const [newItemExternalUrl, setNewItemExternalUrl] = useState("");
-  const [newItemLinkUrl, setNewItemLinkUrl] = useState("");
   const [newItemTextContent, setNewItemTextContent] = useState("");
+  const [newItemDueDate, setNewItemDueDate] = useState("");
 
   const [quizQuestions, setQuizQuestions] = useState([createBlankQuestion()]);
   const [quizPassingGrade, setQuizPassingGrade] = useState(70);
@@ -173,57 +164,99 @@ export default function InstructorCourseDetail() {
   const [contentSearch, setContentSearch] = useState("");
   const [contentSort, setContentSort] = useState("module-order");
 
-  const enrollmentCount = students.length;
+  const courseStatus = course?.status || "Draft";
+  const enrollmentCount = enrollmentRows.length;
+
+  const loadCourseDetail = async () => {
+    try {
+      setLoadingCourse(true);
+      setPageError("");
+
+      const data = await fetchWithAuth(`${API_BASE}/instructor/courses/${id}/`);
+
+      setCourse(data);
+      setModules(data.modules || []);
+      setSelectedRoles(data.selectedRoles || []);
+      setAssignedMemberIds(data.assignedMemberIds || []);
+      setVisibilityLocked(true);
+
+      setExpandedModules((prev) => {
+        const next = {};
+        (data.modules || []).forEach((module) => {
+          next[module.id] = prev[module.id] ?? false;
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error(error);
+      setPageError("Failed to load course details.");
+    } finally {
+      setLoadingCourse(false);
+    }
+  };
+
+  const loadEnrollment = async () => {
+    try {
+      setLoadingEnrollment(true);
+      const data = await fetchWithAuth(`${API_BASE}/instructor/courses/${id}/enrollment/`);
+      setEnrollmentRows(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingEnrollment(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCourseDetail();
+    loadEnrollment();
+  }, [id]);
 
   const filteredStudents = useMemo(() => {
     const value = enrollmentSearch.trim().toLowerCase();
-
-    let result = [...students];
+    let result = [...enrollmentRows];
 
     if (value) {
       result = result.filter((student) => {
         return (
-          student.name.toLowerCase().includes(value) ||
-          student.memberId.toLowerCase().includes(value) ||
-          student.role.toLowerCase().includes(value) ||
-          student.status.toLowerCase().includes(value) ||
-          student.enrollmentDate.toLowerCase().includes(value)
+          (student.name || "").toLowerCase().includes(value) ||
+          (student.memberId || "").toLowerCase().includes(value) ||
+          (student.role || "").toLowerCase().includes(value) ||
+          (student.status || "").toLowerCase().includes(value) ||
+          (student.enrollmentDate || "").toLowerCase().includes(value)
         );
       });
     }
 
     if (enrollmentSort === "date-newest") {
-      result.sort(
-        (a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime()
-      );
+      result.sort((a, b) => new Date(b.enrollmentDate) - new Date(a.enrollmentDate));
     }
 
     if (enrollmentSort === "date-oldest") {
-      result.sort(
-        (a, b) => new Date(a.enrollmentDate).getTime() - new Date(b.enrollmentDate).getTime()
-      );
+      result.sort((a, b) => new Date(a.enrollmentDate) - new Date(b.enrollmentDate));
     }
 
     return result;
-  }, [enrollmentSearch, enrollmentSort]);
+  }, [enrollmentRows, enrollmentSearch, enrollmentSort]);
 
   const filteredAndSortedModules = useMemo(() => {
     let result = [...modules];
-
     const search = contentSearch.trim().toLowerCase();
 
     if (search) {
       result = result.filter((module) => {
-        const moduleMatch = module.title.toLowerCase().includes(search);
+        const moduleMatch = (module.title || "").toLowerCase().includes(search);
 
-        const itemMatch = module.items.some((item) => {
+        const itemMatch = (module.items || []).some((item) => {
           const detailText = [
             item.title,
             item.type,
             item.fileName,
-            item.externalUrl,
-            item.linkUrl,
-            item.textContent,
+            item.external_url,
+            item.text_content,
+            item.audience_type,
+            ...(item.audienceRoles || []),
+            ...(item.audienceMemberIds || []),
           ]
             .filter(Boolean)
             .join(" ")
@@ -237,22 +270,24 @@ export default function InstructorCourseDetail() {
     }
 
     if (contentSort === "recently-added") {
-      result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      result.sort(
+        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
     }
 
     if (contentSort === "module-name-asc") {
-      result.sort((a, b) => a.title.localeCompare(b.title));
+      result.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
     }
 
     if (contentSort === "module-name-desc") {
-      result.sort((a, b) => b.title.localeCompare(a.title));
+      result.sort((a, b) => (b.title || "").localeCompare(a.title || ""));
     }
 
     return result;
   }, [modules, contentSearch, contentSort]);
 
   const toggleRole = (role) => {
-    if (isVisibilitySaved) return;
+    if (visibilityLocked) return;
 
     setSelectedRoles((prev) =>
       prev.includes(role) ? prev.filter((item) => item !== role) : [...prev, role]
@@ -260,19 +295,19 @@ export default function InstructorCourseDetail() {
   };
 
   const handleAddMemberId = () => {
-    if (isVisibilitySaved) return;
+    if (visibilityLocked) return;
 
     const parsedIds = memberIdInput
       .split(",")
-      .map((id) => id.trim())
+      .map((item) => item.trim())
       .filter(Boolean);
 
-    if (parsedIds.length === 0) return;
+    if (!parsedIds.length) return;
 
     setAssignedMemberIds((prev) => {
       const merged = [...prev];
-      parsedIds.forEach((id) => {
-        if (!merged.includes(id)) merged.push(id);
+      parsedIds.forEach((memberId) => {
+        if (!merged.includes(memberId)) merged.push(memberId);
       });
       return merged;
     });
@@ -281,54 +316,74 @@ export default function InstructorCourseDetail() {
   };
 
   const removeMemberId = (idToRemove) => {
-    if (isVisibilitySaved) return;
-    setAssignedMemberIds((prev) => prev.filter((id) => id !== idToRemove));
+    if (visibilityLocked) return;
+    setAssignedMemberIds((prev) => prev.filter((memberId) => memberId !== idToRemove));
   };
 
-  const handleSaveVisibility = () => {
-    setIsVisibilitySaved(true);
+  const handleSaveVisibility = async () => {
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/courses/${id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selectedRoles,
+          assignedMemberIds,
+        }),
+      });
+
+      setVisibilityLocked(true);
+      await loadCourseDetail();
+      await loadEnrollment();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save visibility settings.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleEditVisibility = () => {
-    setIsVisibilitySaved(false);
+  const handleToggleCourseStatus = async () => {
+    if (!course) return;
+
+    const nextStatus = course.status === "Published" ? "Draft" : "Published";
+
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/courses/${id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+
+      setCourse((prev) => ({ ...prev, status: nextStatus }));
+      await loadEnrollment();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update course status.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleCreateModule = () => {
-    const trimmed = newModuleTitle.trim();
-    if (!trimmed) return;
-
-    const newModule = {
-      id: Date.now(),
-      title: trimmed,
-      visible: newModuleVisible,
-      isExpanded: true,
-      createdAt: nowIso(),
-      items: [],
-    };
-
-    setModules((prev) => [...prev, newModule]);
-    setNewModuleTitle("");
-    setNewModuleVisible(true);
-    setShowAddModuleModal(false);
+  const toggleModuleExpanded = (moduleId) => {
+    setExpandedModules((prev) => ({
+      ...prev,
+      [moduleId]: !prev[moduleId],
+    }));
   };
 
   const startEditingModuleTitle = (module) => {
     setEditingModuleId(module.id);
-    setEditingModuleTitle(module.title);
-  };
-
-  const saveModuleTitle = (moduleId) => {
-    const trimmed = editingModuleTitle.trim();
-    if (!trimmed) return;
-
-    setModules((prev) =>
-      prev.map((module) =>
-        module.id === moduleId ? { ...module, title: trimmed } : module
-      )
-    );
-
-    setEditingModuleId(null);
-    setEditingModuleTitle("");
+    setEditingModuleTitle(module.title || "");
   };
 
   const cancelModuleTitleEdit = () => {
@@ -336,46 +391,93 @@ export default function InstructorCourseDetail() {
     setEditingModuleTitle("");
   };
 
-  const toggleModuleExpanded = (moduleId) => {
-    setModules((prev) =>
-      prev.map((module) =>
-        module.id === moduleId
-          ? { ...module, isExpanded: !module.isExpanded }
-          : module
-      )
-    );
+  const saveModuleTitle = async (moduleId) => {
+    const trimmed = editingModuleTitle.trim();
+    if (!trimmed) return;
+
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/modules/${moduleId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: trimmed,
+        }),
+      });
+
+      setModules((prev) =>
+        prev.map((module) => (module.id === moduleId ? { ...module, title: trimmed } : module))
+      );
+
+      cancelModuleTitleEdit();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update module title.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const toggleModuleVisibility = (moduleId) => {
-    setModules((prev) =>
-      prev.map((module) =>
-        module.id === moduleId ? { ...module, visible: !module.visible } : module
-      )
-    );
+  const toggleModuleVisibility = async (module) => {
+    try {
+      setActionLoading(true);
+
+      const updated = await fetchWithAuth(`${API_BASE}/instructor/modules/${module.id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          is_visible: !module.visible,
+        }),
+      });
+
+      const nextVisible = updated?.module?.visible ?? !module.visible;
+
+      setModules((prev) =>
+        prev.map((item) => (item.id === module.id ? { ...item, visible: nextVisible } : item))
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update module visibility.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const toggleItemVisibility = (moduleId, itemId) => {
-    setModules((prev) =>
-      prev.map((module) =>
-        module.id === moduleId
-          ? {
-              ...module,
-              items: module.items.map((item) =>
-                item.id === itemId ? { ...item, visible: !item.visible } : item
-              ),
-            }
-          : module
-      )
-    );
+  const handleDeleteModule = async (moduleId) => {
+    const confirmed = window.confirm("Delete this module and all its items?");
+    if (!confirmed) return;
+
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/modules/${moduleId}/`, {
+        method: "DELETE",
+      });
+
+      setModules((prev) => prev.filter((module) => module.id !== moduleId));
+      setExpandedModules((prev) => {
+        const next = { ...prev };
+        delete next[moduleId];
+        return next;
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete module.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const openAddItemModal = (moduleId) => {
-    setSelectedModuleId(moduleId);
-    resetNewItemForm();
-    setShowAddItemModal(true);
-  };
+  const resetItemForm = () => {
+    setEditingItemId(null);
+    setSelectedModuleId(null);
+    setItemModalMode("create");
 
-  const resetNewItemForm = () => {
     setNewItemTitle("");
     setNewItemType("PDF");
     setNewItemVisible(true);
@@ -386,12 +488,48 @@ export default function InstructorCourseDetail() {
     setNewItemAudienceMemberIds([]);
 
     setNewItemFile(null);
+    setExistingFileName("");
     setNewItemExternalUrl("");
-    setNewItemLinkUrl("");
     setNewItemTextContent("");
+    setNewItemDueDate("");
 
     setQuizQuestions([createBlankQuestion()]);
     setQuizPassingGrade(70);
+  };
+
+  const openAddItemModal = (moduleId) => {
+    resetItemForm();
+    setSelectedModuleId(moduleId);
+    setItemModalMode("create");
+    setShowItemModal(true);
+  };
+
+  const openEditItemModal = (moduleId, item) => {
+    resetItemForm();
+
+    setSelectedModuleId(moduleId);
+    setEditingItemId(item.id);
+    setItemModalMode("edit");
+
+    setNewItemTitle(item.title || "");
+    setNewItemType(item.type || "PDF");
+    setNewItemVisible(Boolean(item.visible));
+
+    setNewItemAudienceType(item.audience_type || "all");
+    setNewItemAudienceRoles(item.audienceRoles || []);
+    setNewItemAudienceMemberIds(item.audienceMemberIds || []);
+
+    setExistingFileName(item.fileName || "");
+    setNewItemExternalUrl(item.external_url || "");
+    setNewItemTextContent(item.text_content || "");
+    setNewItemDueDate(item.due_date || "");
+
+    if (item.type === "Quiz") {
+      setQuizPassingGrade(item.quiz?.passingGrade ?? 70);
+      setQuizQuestions(normalizeQuizQuestions(item.quiz));
+    }
+
+    setShowItemModal(true);
   };
 
   const toggleNewItemRole = (role) => {
@@ -403,15 +541,15 @@ export default function InstructorCourseDetail() {
   const addNewItemMemberIds = () => {
     const parsedIds = newItemAudienceMemberIdInput
       .split(",")
-      .map((id) => id.trim())
+      .map((item) => item.trim())
       .filter(Boolean);
 
-    if (parsedIds.length === 0) return;
+    if (!parsedIds.length) return;
 
     setNewItemAudienceMemberIds((prev) => {
       const merged = [...prev];
-      parsedIds.forEach((id) => {
-        if (!merged.includes(id)) merged.push(id);
+      parsedIds.forEach((memberId) => {
+        if (!merged.includes(memberId)) merged.push(memberId);
       });
       return merged;
     });
@@ -420,96 +558,7 @@ export default function InstructorCourseDetail() {
   };
 
   const removeNewItemMemberId = (idToRemove) => {
-    setNewItemAudienceMemberIds((prev) => prev.filter((id) => id !== idToRemove));
-  };
-
-  const calculateQuizTotalPoints = (questions) => {
-    return questions.reduce((sum, question) => sum + Number(question.points || 0), 0);
-  };
-
-  const handleCreateItem = () => {
-    const trimmedTitle = newItemTitle.trim();
-    if (!trimmedTitle || !selectedModuleId) return;
-
-    if (newItemAudienceType === "role" && newItemAudienceRoles.length === 0) return;
-    if (newItemAudienceType === "member" && newItemAudienceMemberIds.length === 0) return;
-
-    const newItem = {
-      id: Date.now(),
-      type: newItemType,
-      title: trimmedTitle,
-      visible: newItemVisible,
-      createdAt: nowIso(),
-      audienceType: newItemAudienceType,
-      audienceRoles: newItemAudienceRoles,
-      audienceMemberIds: newItemAudienceMemberIds,
-    };
-
-    if (newItemType === "PDF") {
-      newItem.fileName = newItemFile ? newItemFile.name : "";
-    }
-
-    if (newItemType === "External Video") {
-      if (!newItemExternalUrl.trim()) return;
-      newItem.externalUrl = newItemExternalUrl.trim();
-    }
-
-    if (newItemType === "Link") {
-      if (!newItemLinkUrl.trim()) return;
-      newItem.linkUrl = newItemLinkUrl.trim();
-    }
-
-    if (newItemType === "Text Content") {
-      if (!newItemTextContent.trim()) return;
-      newItem.textContent = newItemTextContent.trim();
-    }
-
-    if (newItemType === "Quiz") {
-      const cleanedQuestions = quizQuestions
-        .map((question) => ({
-          ...question,
-          prompt: question.prompt.trim(),
-          points: Number(question.points || 0),
-          options: question.options.map((option) => ({
-            ...option,
-            text: option.text.trim(),
-          })),
-        }))
-        .filter((question) => {
-          const filledOptions = question.options.filter((option) => option.text);
-          return (
-            question.prompt &&
-            filledOptions.length >= 2 &&
-            question.correctOptionId &&
-            question.points > 0
-          );
-        });
-
-      if (cleanedQuestions.length === 0) return;
-
-      newItem.quiz = {
-        autoGrade: true,
-        passingGrade: Number(quizPassingGrade || 0),
-        questions: cleanedQuestions,
-        totalPoints: calculateQuizTotalPoints(cleanedQuestions),
-      };
-    }
-
-    setModules((prev) =>
-      prev.map((module) =>
-        module.id === selectedModuleId
-          ? {
-              ...module,
-              isExpanded: true,
-              items: [...module.items, newItem],
-            }
-          : module
-      )
-    );
-
-    setSelectedModuleId(null);
-    setShowAddItemModal(false);
-    resetNewItemForm();
+    setNewItemAudienceMemberIds((prev) => prev.filter((memberId) => memberId !== idToRemove));
   };
 
   const addQuizQuestion = () => {
@@ -556,11 +605,242 @@ export default function InstructorCourseDetail() {
   const setQuizCorrectAnswer = (questionId, optionId) => {
     setQuizQuestions((prev) =>
       prev.map((question) =>
-        question.id === questionId
-          ? { ...question, correctOptionId: optionId }
-          : question
+        question.id === questionId ? { ...question, correctOptionId: optionId } : question
       )
     );
+  };
+
+  const buildItemJsonPayload = () => {
+    const backendType = labelToBackendType[newItemType];
+
+    const payload = {
+      module: selectedModuleId,
+      title: newItemTitle.trim(),
+      item_type: backendType,
+      is_visible: newItemVisible,
+      audience_type: newItemAudienceType,
+      audience_roles: newItemAudienceRoles,
+      audience_member_ids: newItemAudienceMemberIds,
+      due_date: newItemDueDate || null,
+    };
+
+    if (backendType === "external_video" || backendType === "link") {
+      payload.external_url = newItemExternalUrl.trim();
+    }
+
+    if (backendType === "text") {
+      payload.text_content = newItemTextContent.trim();
+    }
+
+    if (backendType === "quiz") {
+      const cleanedQuestions = quizQuestions
+        .map((question) => ({
+          id: question.id,
+          prompt: question.prompt.trim(),
+          points: Number(question.points || 0),
+          options: question.options
+            .map((option) => ({
+              id: option.id,
+              text: option.text.trim(),
+            }))
+            .filter((option) => option.text),
+          correctOptionId: question.correctOptionId,
+        }))
+        .filter(
+          (question) =>
+            question.prompt &&
+            question.options.length >= 2 &&
+            question.correctOptionId &&
+            question.points > 0
+        );
+
+      if (!cleanedQuestions.length) {
+        throw new Error("Quiz must include at least one valid question.");
+      }
+
+      payload.quiz_data = {
+        autoGrade: true,
+        passingGrade: Number(quizPassingGrade || 0),
+        questions: cleanedQuestions,
+        totalPoints: calculateQuizTotalPoints(cleanedQuestions),
+      };
+    }
+
+    return payload;
+  };
+
+  const buildItemFormDataPayload = () => {
+    const backendType = labelToBackendType[newItemType];
+    const formData = new FormData();
+
+    formData.append("module", selectedModuleId);
+    formData.append("title", newItemTitle.trim());
+    formData.append("item_type", backendType);
+    formData.append("is_visible", newItemVisible ? "true" : "false");
+    formData.append("audience_type", newItemAudienceType);
+
+    newItemAudienceRoles.forEach((role) => {
+      formData.append("audience_roles", role);
+    });
+
+    newItemAudienceMemberIds.forEach((memberId) => {
+      formData.append("audience_member_ids", memberId);
+    });
+
+    if (newItemFile) {
+      formData.append("file", newItemFile);
+    }
+
+    if (newItemDueDate) {
+      formData.append("due_date", newItemDueDate);
+    }
+
+    return formData;
+  };
+
+  const handleCreateModule = async () => {
+    const trimmed = newModuleTitle.trim();
+    if (!trimmed) return;
+
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/courses/${id}/modules/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: trimmed,
+          is_visible: newModuleVisible,
+        }),
+      });
+
+      setShowAddModuleModal(false);
+      setNewModuleTitle("");
+      setNewModuleVisible(true);
+      await loadCourseDetail();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to create module.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSubmitItem = async () => {
+    if (!newItemTitle.trim()) return;
+    if (!selectedModuleId) return;
+
+    try {
+      setActionLoading(true);
+
+      const backendType = labelToBackendType[newItemType];
+      const isFileItem = backendType === "pdf" || backendType === "video";
+      const isEditing = itemModalMode === "edit" && editingItemId;
+
+      if (newItemAudienceType === "role" && !newItemAudienceRoles.length) {
+        throw new Error("Select at least one leadership role.");
+      }
+
+      if (newItemAudienceType === "member" && !newItemAudienceMemberIds.length) {
+        throw new Error("Add at least one member ID.");
+      }
+
+      let url = `${API_BASE}/instructor/modules/${selectedModuleId}/items/`;
+      let method = "POST";
+      let headers = {};
+      let body;
+
+      if (isEditing) {
+        url = `${API_BASE}/instructor/items/${editingItemId}/`;
+        method = "PATCH";
+      }
+
+      if (isFileItem && (newItemFile || itemModalMode === "create")) {
+        body = buildItemFormDataPayload();
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(buildItemJsonPayload());
+      }
+
+      await fetchWithAuth(url, {
+        method,
+        headers,
+        body,
+      });
+
+      setShowItemModal(false);
+      resetItemForm();
+      await loadCourseDetail();
+
+      if (selectedModuleId) {
+        setExpandedModules((prev) => ({
+          ...prev,
+          [selectedModuleId]: true,
+        }));
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Failed to save item.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const toggleItemVisibility = async (item) => {
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/items/${item.id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          is_visible: !item.visible,
+        }),
+      });
+
+      setModules((prev) =>
+        prev.map((module) => ({
+          ...module,
+          items: (module.items || []).map((entry) =>
+            entry.id === item.id ? { ...entry, visible: !entry.visible } : entry
+          ),
+        }))
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update item visibility.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId) => {
+    const confirmed = window.confirm("Delete this item?");
+    if (!confirmed) return;
+
+    try {
+      setActionLoading(true);
+
+      await fetchWithAuth(`${API_BASE}/instructor/items/${itemId}/`, {
+        method: "DELETE",
+      });
+
+      setModules((prev) =>
+        prev.map((module) => ({
+          ...module,
+          items: (module.items || []).filter((item) => item.id !== itemId),
+        }))
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete item.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const renderTypeSpecificFields = () => {
@@ -574,34 +854,43 @@ export default function InstructorCourseDetail() {
             onChange={(e) => setNewItemFile(e.target.files?.[0] || null)}
             className="file-input"
           />
+          {existingFileName && itemModalMode === "edit" && !newItemFile && (
+            <p className="field-helper">Current file: {existingFileName}</p>
+          )}
           {newItemFile && <p className="field-helper">Selected file: {newItemFile.name}</p>}
         </div>
       );
     }
 
-    if (newItemType === "External Video") {
+    if (newItemType === "Video") {
       return (
         <div className="modal-field">
-          <label>Video URL</label>
+          <label>Upload Video</label>
           <input
-            type="url"
-            value={newItemExternalUrl}
-            onChange={(e) => setNewItemExternalUrl(e.target.value)}
-            placeholder="Paste external video link"
+            type="file"
+            accept="video/*"
+            onChange={(e) => setNewItemFile(e.target.files?.[0] || null)}
+            className="file-input"
           />
+          {existingFileName && itemModalMode === "edit" && !newItemFile && (
+            <p className="field-helper">Current file: {existingFileName}</p>
+          )}
+          {newItemFile && <p className="field-helper">Selected file: {newItemFile.name}</p>}
         </div>
       );
     }
 
-    if (newItemType === "Link") {
+    if (newItemType === "External Video" || newItemType === "Link") {
       return (
         <div className="modal-field">
-          <label>Link URL</label>
+          <label>{newItemType === "External Video" ? "Video URL" : "Link URL"}</label>
           <input
             type="url"
-            value={newItemLinkUrl}
-            onChange={(e) => setNewItemLinkUrl(e.target.value)}
-            placeholder="Paste link"
+            value={newItemExternalUrl}
+            onChange={(e) => setNewItemExternalUrl(e.target.value)}
+            placeholder={
+              newItemType === "External Video" ? "Paste external video link" : "Paste link"
+            }
           />
         </div>
       );
@@ -623,9 +912,9 @@ export default function InstructorCourseDetail() {
 
     if (newItemType === "Quiz") {
       const totalPoints = calculateQuizTotalPoints(
-        quizQuestions.map((q) => ({
-          ...q,
-          points: Number(q.points || 0),
+        quizQuestions.map((question) => ({
+          ...question,
+          points: Number(question.points || 0),
         }))
       );
 
@@ -635,8 +924,8 @@ export default function InstructorCourseDetail() {
             <div>
               <h3>Quiz Builder</h3>
               <p>
-                Add questions, set the correct answers, assign points to each question,
-                and define the passing grade.
+                Add questions, edit them any time, set the correct answers, assign points, and
+                define the passing grade.
               </p>
             </div>
 
@@ -750,18 +1039,48 @@ export default function InstructorCourseDetail() {
     return null;
   };
 
+  if (loadingCourse) {
+    return (
+      <InstructorLayout
+        breadcrumbs={[
+          { label: "My Courses", path: "/instructor/courses" },
+          { label: "Loading...", path: "#" },
+        ]}
+      >
+        <div className="course-detail-page">
+          <p>Loading course...</p>
+        </div>
+      </InstructorLayout>
+    );
+  }
+
+  if (pageError || !course) {
+    return (
+      <InstructorLayout
+        breadcrumbs={[
+          { label: "My Courses", path: "/instructor/courses" },
+          { label: "Error", path: "#" },
+        ]}
+      >
+        <div className="course-detail-page">
+          <p>{pageError || "Course not found."}</p>
+        </div>
+      </InstructorLayout>
+    );
+  }
+
   return (
     <InstructorLayout
       breadcrumbs={[
         { label: "My Courses", path: "/instructor/courses" },
-        { label: "Leadership Training 101", path: "/instructor/courses/1" },
+        { label: course.title || course.name, path: `/instructor/courses/${id}` },
         { label: activeTab, path: "#" },
       ]}
     >
       <div className="course-detail-page">
         <div className="course-detail-header">
           <div>
-            <h1>Leadership Training 101</h1>
+            <h1>{course.title || course.name}</h1>
           </div>
 
           {activeTab === "Content" && (
@@ -799,9 +1118,8 @@ export default function InstructorCourseDetail() {
                   className={`overview-box status-flip-card ${
                     courseStatus === "Published" ? "published" : "draft"
                   }`}
-                  onClick={() =>
-                    setCourseStatus((prev) => (prev === "Published" ? "Draft" : "Published"))
-                  }
+                  onClick={handleToggleCourseStatus}
+                  disabled={actionLoading}
                 >
                   <span className="overview-label">Course Status</span>
                   <div className="status-flip-content">
@@ -814,7 +1132,7 @@ export default function InstructorCourseDetail() {
               </div>
             </div>
 
-            <div className={`detail-card visibility-card ${isVisibilitySaved ? "saved" : ""}`}>
+            <div className={`detail-card visibility-card ${visibilityLocked ? "saved" : ""}`}>
               <div className="visibility-header">
                 <div>
                   <h2>Visibility & Assignment</h2>
@@ -823,18 +1141,18 @@ export default function InstructorCourseDetail() {
                   </p>
                 </div>
 
-                {isVisibilitySaved ? (
-                  <button className="outline-btn" onClick={handleEditVisibility}>
+                {visibilityLocked ? (
+                  <button className="outline-btn" onClick={() => setVisibilityLocked(false)}>
                     Edit Visibility
                   </button>
                 ) : (
-                  <button className="outline-btn" onClick={handleSaveVisibility}>
+                  <button className="outline-btn" onClick={handleSaveVisibility} disabled={actionLoading}>
                     Save Visibility
                   </button>
                 )}
               </div>
 
-              {isVisibilitySaved && (
+              {visibilityLocked && (
                 <div className="saved-banner">
                   Visibility settings saved. Click Edit Visibility to make changes.
                 </div>
@@ -853,7 +1171,7 @@ export default function InstructorCourseDetail() {
                         className={[
                           "position-option",
                           checked ? "checked" : "",
-                          isVisibilitySaved ? "disabled" : "",
+                          visibilityLocked ? "disabled" : "",
                         ]
                           .join(" ")
                           .trim()}
@@ -862,7 +1180,7 @@ export default function InstructorCourseDetail() {
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleRole(role)}
-                          disabled={isVisibilitySaved}
+                          disabled={visibilityLocked}
                         />
                         <span className="custom-checkbox" />
                         <span className="position-label">{role}</span>
@@ -882,29 +1200,29 @@ export default function InstructorCourseDetail() {
                     onChange={(e) => setMemberIdInput(e.target.value)}
                     placeholder="Enter one or more member IDs separated by commas"
                     className="member-id-input"
-                    disabled={isVisibilitySaved}
+                    disabled={visibilityLocked}
                   />
                   <button
                     type="button"
                     className="gold-action-btn small"
                     onClick={handleAddMemberId}
-                    disabled={isVisibilitySaved}
+                    disabled={visibilityLocked}
                   >
                     Add
                   </button>
                 </div>
 
                 <div className="member-id-tags">
-                  {assignedMemberIds.map((id) => (
+                  {assignedMemberIds.map((memberId) => (
                     <span
-                      key={id}
-                      className={isVisibilitySaved ? "member-id-pill disabled" : "member-id-pill"}
+                      key={memberId}
+                      className={visibilityLocked ? "member-id-pill disabled" : "member-id-pill"}
                     >
-                      {id}
+                      {memberId}
                       <button
                         type="button"
-                        onClick={() => removeMemberId(id)}
-                        disabled={isVisibilitySaved}
+                        onClick={() => removeMemberId(memberId)}
+                        disabled={visibilityLocked}
                       >
                         ×
                       </button>
@@ -951,10 +1269,10 @@ export default function InstructorCourseDetail() {
                           type="button"
                           className="accordion-toggle"
                           onClick={() => toggleModuleExpanded(module.id)}
-                          aria-label={module.isExpanded ? "Collapse module" : "Expand module"}
-                          title={module.isExpanded ? "Collapse module" : "Expand module"}
+                          aria-label={expandedModules[module.id] ? "Collapse module" : "Expand module"}
+                          title={expandedModules[module.id] ? "Collapse module" : "Expand module"}
                         >
-                          <span className={`accordion-arrow ${module.isExpanded ? "open" : ""}`}>
+                          <span className={`accordion-arrow ${expandedModules[module.id] ? "open" : ""}`}>
                             ⌃
                           </span>
                         </button>
@@ -995,6 +1313,15 @@ export default function InstructorCourseDetail() {
                             >
                               ✎
                             </button>
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => handleDeleteModule(module.id)}
+                              title="Delete module"
+                              aria-label="Delete module"
+                            >
+                              🗑
+                            </button>
                           </>
                         )}
                       </div>
@@ -1012,7 +1339,7 @@ export default function InstructorCourseDetail() {
 
                         <button
                           className="outline-btn small-outline-btn"
-                          onClick={() => toggleModuleVisibility(module.id)}
+                          onClick={() => toggleModuleVisibility(module)}
                         >
                           {module.visible ? "Hide Module" : "Show Module"}
                         </button>
@@ -1024,9 +1351,9 @@ export default function InstructorCourseDetail() {
                     </button>
                   </div>
 
-                  {module.isExpanded && (
+                  {expandedModules[module.id] && (
                     <div className="content-item-list">
-                      {module.items.length === 0 ? (
+                      {!module.items || module.items.length === 0 ? (
                         <div className="empty-module-state">No items yet in this module.</div>
                       ) : (
                         module.items.map((item) => (
@@ -1039,34 +1366,51 @@ export default function InstructorCourseDetail() {
                                 <span className="item-detail-line">File: {item.fileName}</span>
                               )}
 
-                              {item.type === "External Video" && item.externalUrl && (
-                                <span className="item-detail-line">Video link added</span>
-                              )}
+                              {(item.type === "External Video" || item.type === "Link") &&
+                                item.external_url && (
+                                  <span className="item-detail-line">
+                                    URL:{" "}
+                                    <a
+                                      href={item.external_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      Open link
+                                    </a>
+                                  </span>
+                                )}
 
-                              {item.type === "Link" && item.linkUrl && (
-                                <span className="item-detail-line">External link added</span>
-                              )}
-
-                              {item.type === "Text Content" && item.textContent && (
+                              {item.type === "Text Content" && item.text_content && (
                                 <span className="item-detail-line">Text content ready</span>
                               )}
 
                               {item.type === "Quiz" && item.quiz && (
                                 <span className="item-detail-line">
-                                  {item.quiz.questions.length} question
-                                  {item.quiz.questions.length !== 1 ? "s" : ""} ·{" "}
-                                  {item.quiz.totalPoints} points · Pass {item.quiz.passingGrade}% ·
-                                  Auto-graded
+                                  {item.quiz.questions?.length || 0} question
+                                  {(item.quiz.questions?.length || 0) !== 1 ? "s" : ""} ·{" "}
+                                  {item.quiz.totalPoints || 0} points · Pass{" "}
+                                  {item.quiz.passingGrade ?? 70}% · Auto-graded
                                 </span>
                               )}
+
+                              {item.audience_type === "role" && item.audienceRoles?.length > 0 && (
+                                <span className="item-detail-line">
+                                  Visible to: {item.audienceRoles.join(", ")}
+                                </span>
+                              )}
+
+                              {item.audience_type === "member" &&
+                                item.audienceMemberIds?.length > 0 && (
+                                  <span className="item-detail-line">
+                                    Member IDs: {item.audienceMemberIds.join(", ")}
+                                  </span>
+                                )}
                             </div>
 
                             <div className="content-item-actions">
                               <span
                                 className={
-                                  item.visible
-                                    ? "item-status-pill visible"
-                                    : "item-status-pill hidden"
+                                  item.visible ? "item-status-pill visible" : "item-status-pill hidden"
                                 }
                               >
                                 {item.visible ? "Visible" : "Hidden"}
@@ -1074,9 +1418,23 @@ export default function InstructorCourseDetail() {
 
                               <button
                                 className="outline-btn small-outline-btn"
-                                onClick={() => toggleItemVisibility(module.id, item.id)}
+                                onClick={() => toggleItemVisibility(item)}
                               >
                                 {item.visible ? "Hide Item" : "Show Item"}
+                              </button>
+
+                              <button
+                                className="outline-btn small-outline-btn"
+                                onClick={() => openEditItemModal(module.id, item)}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="outline-btn small-outline-btn"
+                                onClick={() => handleDeleteItem(item.id)}
+                              >
+                                Delete
                               </button>
                             </div>
                           </div>
@@ -1122,27 +1480,35 @@ export default function InstructorCourseDetail() {
               </div>
             </div>
 
-            <div className="student-table">
-              <div className="student-row header six-col">
-                <span>Name</span>
-                <span>Member ID</span>
-                <span>Role</span>
-                <span>Progress</span>
-                <span>Status</span>
-                <span>Enrollment Date</span>
-              </div>
-
-              {filteredStudents.map((student) => (
-                <div key={student.id} className="student-row six-col">
-                  <span>{student.name}</span>
-                  <span>{student.memberId}</span>
-                  <span>{student.role}</span>
-                  <span>{student.progress}%</span>
-                  <span>{student.status}</span>
-                  <span>{student.enrollmentDate}</span>
+            {loadingEnrollment ? (
+              <p>Loading enrollment...</p>
+            ) : (
+              <div className="student-table">
+                <div className="student-row header six-col">
+                  <span>Name</span>
+                  <span>Member ID</span>
+                  <span>Role</span>
+                  <span>Progress</span>
+                  <span>Status</span>
+                  <span>Enrollment Date</span>
                 </div>
-              ))}
-            </div>
+
+                {filteredStudents.map((student) => (
+                  <div key={student.id} className="student-row six-col">
+                    <span>{student.name}</span>
+                    <span>{student.memberId}</span>
+                    <span>{student.role}</span>
+                    <span>{student.progress}%</span>
+                    <span>{student.status}</span>
+                    <span>{student.enrollmentDate}</span>
+                  </div>
+                ))}
+
+                {!filteredStudents.length && (
+                  <div className="empty-module-state">No enrolled members match your search.</div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1175,7 +1541,7 @@ export default function InstructorCourseDetail() {
                 <button className="outline-btn" onClick={() => setShowAddModuleModal(false)}>
                   Cancel
                 </button>
-                <button className="gold-action-btn" onClick={handleCreateModule}>
+                <button className="gold-action-btn" onClick={handleCreateModule} disabled={actionLoading}>
                   Create Module
                 </button>
               </div>
@@ -1183,10 +1549,10 @@ export default function InstructorCourseDetail() {
           </div>
         )}
 
-        {showAddItemModal && (
-          <div className="modal-overlay" onClick={() => setShowAddItemModal(false)}>
+        {showItemModal && (
+          <div className="modal-overlay" onClick={() => setShowItemModal(false)}>
             <div className="modal-card large-modal-card" onClick={(e) => e.stopPropagation()}>
-              <h2>Add Item</h2>
+              <h2>{itemModalMode === "edit" ? "Edit Item" : "Add Item"}</h2>
 
               <div className="modal-field">
                 <label>Item Title</label>
@@ -1202,7 +1568,8 @@ export default function InstructorCourseDetail() {
                 <label>Item Type</label>
                 <select value={newItemType} onChange={(e) => setNewItemType(e.target.value)}>
                   <option value="PDF">PDF</option>
-                  <option value="External Video">External Video</option>
+                  <option value="Video">Video (upload)</option>
+                  <option value="External Video">External Video (link)</option>
                   <option value="Quiz">Quiz</option>
                   <option value="Text Content">Text Content</option>
                   <option value="Link">Link</option>
@@ -1210,6 +1577,15 @@ export default function InstructorCourseDetail() {
               </div>
 
               {renderTypeSpecificFields()}
+
+              <div className="modal-field">
+                <label>Due Date (optional)</label>
+                <input
+                  type="date"
+                  value={newItemDueDate}
+                  onChange={(e) => setNewItemDueDate(e.target.value)}
+                />
+              </div>
 
               <div className="modal-field">
                 <label>Who should see this item?</label>
@@ -1271,10 +1647,10 @@ export default function InstructorCourseDetail() {
                   </div>
 
                   <div className="member-id-tags">
-                    {newItemAudienceMemberIds.map((id) => (
-                      <span key={id} className="member-id-pill">
-                        {id}
-                        <button type="button" onClick={() => removeNewItemMemberId(id)}>
+                    {newItemAudienceMemberIds.map((memberId) => (
+                      <span key={memberId} className="member-id-pill">
+                        {memberId}
+                        <button type="button" onClick={() => removeNewItemMemberId(memberId)}>
                           ×
                         </button>
                       </span>
@@ -1294,11 +1670,17 @@ export default function InstructorCourseDetail() {
               </div>
 
               <div className="modal-actions">
-                <button className="outline-btn" onClick={() => setShowAddItemModal(false)}>
+                <button
+                  className="outline-btn"
+                  onClick={() => {
+                    setShowItemModal(false);
+                    resetItemForm();
+                  }}
+                >
                   Cancel
                 </button>
-                <button className="gold-action-btn" onClick={handleCreateItem}>
-                  Add Item
+                <button className="gold-action-btn" onClick={handleSubmitItem} disabled={actionLoading}>
+                  {itemModalMode === "edit" ? "Save Changes" : "Add Item"}
                 </button>
               </div>
             </div>

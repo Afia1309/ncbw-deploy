@@ -23,7 +23,7 @@ export default function MemberLayout({ title, children }) {
       .catch((err) => {
         console.error("Unread count fetch failed:", err);
       });
-  }, [token]);
+  }, [token, location.pathname]);
 
   useEffect(() => {
     fetchUserData();

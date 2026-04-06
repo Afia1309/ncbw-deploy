@@ -17,7 +17,7 @@ const POSITIONS = [
 export default function Signup() {
   const navigate = useNavigate();
 
-  const [memberId, setMemberId] = useState("");
+  const [role, setRole] = useState("trainee");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -54,12 +54,12 @@ export default function Signup() {
     setLoading(true);
     try {
       await api.post("/auth/register/", {
-        member_id: memberId,
+        role,
         first_name: firstName,
         last_name: lastName,
         email,
         phone_number: phoneNumber,
-        position,
+        position: role === "instructor" ? "General Member" : position,
         password,
         password_confirm: passwordConfirm,
       });
@@ -103,21 +103,23 @@ export default function Signup() {
 
       <div className="auth-card signup-card">
         <h1>Sign Up</h1>
+        <p style={{ fontSize: "0.85rem", color: "#6b7280", margin: "-8px 0 16px" }}>
+          Your account ID will be generated automatically based on your role.
+        </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">
-            <label htmlFor="memberId">Member ID</label>
-            <input
-              id="memberId"
-              className="auth-input"
-              type="text"
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
+            <label htmlFor="role">Account Role</label>
+            <select
+              id="role"
+              className="auth-select"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
               required
-            />
-            {fieldErrors.member_id && (
-              <div className="field-error">{fieldErrors.member_id}</div>
-            )}
+            >
+              <option value="trainee">Member / Trainee</option>
+              <option value="instructor">Instructor</option>
+            </select>
           </div>
 
           <div className="auth-field">
@@ -179,26 +181,28 @@ export default function Signup() {
             )}
           </div>
 
-          <div className="auth-field">
-            <label htmlFor="position">Position You Are Going For</label>
-            <select
-              id="position"
-              className="auth-select"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              required
-            >
-              <option value="">Select a position</option>
-              {POSITIONS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.position && (
-              <div className="field-error">{fieldErrors.position}</div>
-            )}
-          </div>
+          {role === "trainee" && (
+            <div className="auth-field">
+              <label htmlFor="position">Position You Are Going For</label>
+              <select
+                id="position"
+                className="auth-select"
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                required
+              >
+                <option value="">Select a position</option>
+                {POSITIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.position && (
+                <div className="field-error">{fieldErrors.position}</div>
+              )}
+            </div>
+          )}
 
           <div className="auth-field">
             <label htmlFor="password">Password</label>
