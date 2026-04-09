@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.utils import timezone
-
+from .certificate_utils import generate_certificate_pdf
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -20,6 +21,7 @@ from .models import (
     ItemProgress,
     Module,
 )
+
 from .serializers import (
     CourseAudienceUpdateSerializer,
     InstructorCourseDetailSerializer,
@@ -478,7 +480,6 @@ class TraineeCourseListView(APIView):
         if not hasattr(request.user, "profile") or request.user.profile.role not in ["trainee", "admin"]:
             return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Check and create due-date notifications for this trainee
         if request.user.profile.role == "trainee":
             try:
                 from notifications.utils import check_due_date_notifications
@@ -597,7 +598,7 @@ class InstructorNotifyView(APIView):
         if notification_type not in valid_types:
             notification_type = "info"
 
-        # Find all active trainees enrolled in this course
+       
         trainees = User.objects.filter(
             profile__role="trainee",
             profile__status="active",
@@ -653,3 +654,108 @@ def update_item_progress(request, item_id):
         "status": progress.status,
         "completed_at": progress.completed_at,
     })
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_certificate(request):
+    user = request.user
+    
+    courses = Course.objects.filter(status="Published").prefetch_related(
+        "position_targets",
+        "member_targets",
+        "modules__items"
+    )
+    
+    eligible_courses = []
+    for course in courses:
+        if not (course_matches_user(course, user) or is_admin(user)):
+            continue
+        
+        visible_items = visible_items_for_user(course, user)
+        if not visible_items:
+            continue
+        
+        item_ids = [item.id for item in visible_items]
+        completed_count = ItemProgress.objects.filter(
+            user=user,
+            item_id__in=item_ids,
+            status='completed'
+        ).count()
+        
+        if completed_count == len(visible_items) and len(visible_items) > 0:
+            eligible_courses.append(course)
+    
+    if not eligible_courses:
+        return Response(
+            {"detail": "Complete all items in a course first to earn a certificate."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    first_course = eligible_courses[0]
+    certificate_data = {
+        "certificate": {
+            "user": user.get_full_name() or user.username,
+            "member_id": get_member_id(user),
+            "track": "Leadership Training Program",
+            "issued_date": timezone.now().strftime("%B %d, %Y"),
+            "certificate_code": f"NCBW-{user.id}-{first_course.id}-{timezone.now().year}"
+        }
+    }
+    
+    return Response(certificate_data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_certificate_pdf(request):
+    user = request.user
+    
+    courses = Course.objects.filter(status="Published").prefetch_related(
+        "position_targets",
+        "member_targets",
+        "modules__items"
+    )
+    
+    eligible_course = None
+    for course in courses:
+        if not (course_matches_user(course, user) or is_admin(user)):
+            continue
+        
+        visible_items = visible_items_for_user(course, user)
+        if not visible_items:
+            continue
+        
+        item_ids = [item.id for item in visible_items]
+        completed_count = ItemProgress.objects.filter(
+            user=user,
+            item_id__in=item_ids,
+            status='completed'
+        ).count()
+        
+        if completed_count == len(visible_items) and len(visible_items) > 0:
+            eligible_course = course
+            break
+    
+    if not eligible_course:
+        return Response(
+            {"detail": "Complete all items in a course first to download certificate."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    user_name = user.get_full_name() or user.username
+    member_id = get_member_id(user)
+    course_name = eligible_course.name
+    completion_date = timezone.now().strftime("%B %d, %Y")
+    certificate_code = f"NCBW-{user.id}-{eligible_course.id}-{timezone.now().year}"
+    
+    pdf_buffer = generate_certificate_pdf(
+        user_name=user_name,
+        member_id=member_id,
+        course_name=course_name,
+        completion_date=completion_date,
+        certificate_code=certificate_code
+    )
+    
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="certificate_{user.id}_{eligible_course.id}.pdf"'
+    return response

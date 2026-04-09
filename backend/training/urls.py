@@ -19,4 +19,7 @@ urlpatterns = [
     path("courses/", views.TraineeCourseListView.as_view(), name="trainee-course-list"),
     path("courses/<int:course_id>/", views.TraineeCourseDetailView.as_view(), name="trainee-course-detail"),
     path("items/<int:item_id>/progress/", views.update_item_progress, name="item-progress-update"),
+
+    path('certificate/', views.get_certificate, name='certificate'),
+    path('certificate/pdf/', views.download_certificate_pdf, name='certificate_pdf'),
 ]
