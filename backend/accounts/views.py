@@ -88,6 +88,9 @@ def update_profile(request):
         user = request.user
         profile = user.profile
 
+        print(f"Updating profile for user: {user.username} (ID: {user.id})")
+        print(f"Request data: {request.data}")
+
         first_name = request.data.get("first_name")
         last_name = request.data.get("last_name")
         email = request.data.get("email")
@@ -97,12 +100,18 @@ def update_profile(request):
         if last_name is not None:
             user.last_name = last_name
         if email:
-            if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
-                return Response(
-                    {"email": ["This email is already registered."]},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            user.email = email.lower().strip()
+            print(f"Current user email: {user.email}")
+            print(f"New email requested: {email}")
+            
+            if email.lower().strip() != user.email.lower():
+                if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
+                    print(f"Email {email} already exists for another user")
+                    return Response(
+                        {"email": ["This email is already registered."]},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                user.email = email.lower().strip()
+                print(f"Email updated to: {user.email}")
 
         user.save()
 
@@ -115,6 +124,8 @@ def update_profile(request):
             profile.position = position
 
         profile.save()
+
+        print("Profile updated successfully")
 
         return Response(
             {
@@ -134,11 +145,12 @@ def update_profile(request):
 
     except Exception as e:
         print(f"Update profile error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response(
             {"detail": f"Failed to update profile: {str(e)}"},
             status=status.HTTP_400_BAD_REQUEST,
         )
-
 
 def set_user_password_with_validation(user, new_password, confirm_password):
     if user.check_password(new_password):
