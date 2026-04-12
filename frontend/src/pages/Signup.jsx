@@ -95,7 +95,7 @@ export default function Signup() {
     >
       <div className="auth-left">
         <h1 className="auth-title">
-          Welcome to NCBW
+          Welcome to the NCBW-QCMC
           <br />
           Training Portal
         </h1>
@@ -103,7 +103,7 @@ export default function Signup() {
 
       <div className="auth-card signup-card">
         <h1>Sign Up</h1>
-        <p style={{ fontSize: "0.85rem", color: "#6b7280", margin: "-8px 0 16px" }}>
+        <p style={{ fontSize: "0.85rem", color: "#f20606", margin: "-8px 0 16px" }}>
           Your account ID will be generated automatically based on your role.
         </p>
 
