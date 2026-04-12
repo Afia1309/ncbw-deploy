@@ -76,7 +76,7 @@ export default function Login() {
     <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
       <div className="auth-left">
         <h1 className="auth-title">
-          Welcome to NCBW
+          Welcome to the NCBW-QCMC
           <br />
           Training Portal
         </h1>
