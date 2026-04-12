@@ -8,11 +8,11 @@ export default function AdminLayout({ title, children }) {
   const navItems = [
     { label: "Dashboard", path: "/admin/dashboard" },
     { label: "Profile", path: "/admin/profile" },
-    { label: "Courses", path: "/admin/courses" },    // placeholder for later
-    { label: "Messages", path: "/admin/messages" },  // placeholder
-    { label: "Feedback", path: "/admin/feedback" },  // placeholder
-    { label: "Members", path: "/admin/members" },    // placeholder
-    { label: "Reports", path: "/admin/reports" },    // placeholder
+    { label: "Courses", path: "/admin/courses" },
+    { label: "Messages", path: "/admin/messages" },
+    { label: "Feedback", path: "/admin/feedback" },
+    { label: "Members", path: "/admin/members" },
+    { label: "Reports", path: "/admin/reports" },
   ];
 
   const adminName = "Admin User";
@@ -23,9 +23,17 @@ export default function AdminLayout({ title, children }) {
 
   return (
     <div className="dash-page">
-      {/* Sidebar */}
       <aside className="dash-sidebar">
-        <div className="dash-logo">NCBW</div>
+        <div
+          className="dash-logo"
+          style={{
+            color: "#D4AF37",
+            fontSize: "18px",
+            letterSpacing: "0.08em",
+          }}
+        >
+          NCBW-QCMC
+        </div>
 
         <nav className="dash-nav">
           {navItems.map((item) => (
@@ -52,7 +60,6 @@ export default function AdminLayout({ title, children }) {
         </nav>
       </aside>
 
-      {/* Main */}
       <main className="dash-main">
         <header className="dash-header">
           <div className="dash-header-left">
@@ -61,7 +68,7 @@ export default function AdminLayout({ title, children }) {
               <div className="dash-header-title">{title}</div>
             </div>
           </div>
-          <div className="dash-header-brand">NCBW</div>
+          <div className="dash-header-brand">NCBW-QCMC</div>
         </header>
 
         <div className="dash-content">{children}</div>
