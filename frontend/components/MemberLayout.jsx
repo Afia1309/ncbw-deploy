@@ -74,7 +74,16 @@ export default function MemberLayout({ title, children }) {
   return (
     <div className="dash-page">
       <aside className="dash-sidebar">
-        <div className="dash-logo">NCBW</div>
+        <div
+          className="dash-logo"
+          style={{
+            color: "#D4AF37",
+            fontSize: "18px",
+            letterSpacing: "0.08em",
+          }}
+        >
+          NCBW-QCMC
+        </div>
 
         <nav className="dash-nav">
           {navItems.map((item) => {
@@ -115,8 +124,6 @@ export default function MemberLayout({ title, children }) {
               <div className="dash-header-title">{title}</div>
             </div>
           </div>
-
-          <div className="dash-header-brand">NCBW</div>
         </header>
 
         <div className="dash-content">{children}</div>
