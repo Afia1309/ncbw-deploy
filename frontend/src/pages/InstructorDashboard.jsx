@@ -1,47 +1,50 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import InstructorLayout from "../components/InstructorLayout";
 import "./InstructorDashboard.css";
 
-const courses = [
-  {
-    id: 1,
-    title: "Leadership Training 101",
-    subtitle: "General Members",
-    image:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
-    status: "Published",
-  },
-  {
-    id: 2,
-    title: "Vice President Leadership Track",
-    subtitle: "Vice Presidents",
-    image:
-      "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80",
-    status: "Draft",
-  },
-  {
-    id: 3,
-    title: "President Strategy Series",
-    subtitle: "Presidents",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80",
-    status: "Published",
-  },
-  {
-    id: 4,
-    title: "Chapter Operations Essentials",
-    subtitle: "Selected Students",
-    image:
-      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80",
-    status: "Published",
-  },
-];
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/api/training`;
+
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80";
 
 export default function InstructorDashboard() {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const token =
+            localStorage.getItem("access") ||
+            localStorage.getItem(access_token) ||
+            "";
+            
+        const response = await fetch(`${API_BASE}/instructor/courses/`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load courses");
+        }
+
+        const data = await response.json();
+        setCourses(data.slice(0, 4));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
   return (
-    <InstructorLayout
-      breadcrumbs={[{ label: "My Courses", path: "/instructor/dashboard" }]}
-    >
+    <InstructorLayout breadcrumbs={[{ label: "My Courses", path: "/instructor/dashboard" }]}>
       <div className="instructor-page">
         <div className="section-header-row">
           <div>
@@ -56,31 +59,35 @@ export default function InstructorDashboard() {
           </Link>
         </div>
 
-        <div className="course-tile-grid">
-          {courses.map((course) => (
-            <Link
-              key={course.id}
-              to={`/instructor/courses/${course.id}`}
-              className="course-tile-link"
-            >
-              <div className="course-tile">
-                <div
-                  className="course-tile-image"
-                  style={{ backgroundImage: `url(${course.image})` }}
-                />
-                <div className="course-tile-body">
-                  <div className="course-tile-top">
-                    <h3>{course.title}</h3>
-                    <span className={`status-pill ${course.status.toLowerCase()}`}>
-                      {course.status}
-                    </span>
+        {loading ? (
+          <p>Loading courses...</p>
+        ) : (
+          <div className="course-tile-grid">
+            {courses.map((course) => (
+              <Link
+                key={course.id}
+                to={`/instructor/courses/${course.id}`}
+                className="course-tile-link"
+              >
+                <div className="course-tile">
+                  <div
+                    className="course-tile-image"
+                    style={{ backgroundImage: `url(${course.image || FALLBACK_IMAGE})` }}
+                  />
+                  <div className="course-tile-body">
+                    <div className="course-tile-top">
+                      <h3>{course.title || course.name}</h3>
+                      <span className={`status-pill ${(course.status || "").toLowerCase()}`}>
+                        {course.status}
+                      </span>
+                    </div>
+                    <p>{course.subtitle || "Unassigned"}</p>
                   </div>
-                  <p>{course.subtitle}</p>
                 </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </InstructorLayout>
   );

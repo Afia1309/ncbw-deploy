@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
+  baseURL: `${BASE}/api/`,
 });
 
 // Attach access token to every request automatically
@@ -30,7 +32,7 @@ api.interceptors.response.use(
 
         // ask backend for new access token
         const response = await axios.post(
-          "http://127.0.0.1:8000/api/token/refresh/",
+          `${BASE}/api/token/refresh/`,
           { refresh }
         );
 

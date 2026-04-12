@@ -338,8 +338,8 @@ export default function AdminCourseManagement() {
                     value={formData.status}
                     onChange={handleChange}
                   >
-                    <option value="Open">Open</option>
                     <option value="Draft">Draft</option>
+                    <option value="Published">Published</option>
                   </select>
                 </div>
 

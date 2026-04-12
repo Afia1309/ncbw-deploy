@@ -1,89 +1,55 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import InstructorLayout from "../components/InstructorLayout";
 import "./InstructorCourses.css";
 
-const courses = [
-  {
-    id: 1,
-    title: "Leadership Training 101",
-    subtitle: "General Members",
-    instructor: "Afua Atiase",
-    code: "NCBW-101",
-    image:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
-    status: "Published",
-  },
-  {
-    id: 2,
-    title: "Vice President Leadership Track",
-    subtitle: "Vice Presidents",
-    instructor: "Afua Atiase",
-    code: "NCBW-201",
-    image:
-      "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80",
-    status: "Draft",
-  },
-  {
-    id: 3,
-    title: "President Strategy Series",
-    subtitle: "Presidents",
-    instructor: "Afua Atiase",
-    code: "NCBW-301",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80",
-    status: "Published",
-  },
-  {
-    id: 4,
-    title: "Chapter Operations Essentials",
-    subtitle: "Selected Students",
-    instructor: "Afua Atiase",
-    code: "NCBW-220",
-    image:
-      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80",
-    status: "Published",
-  },
-  {
-    id: 5,
-    title: "General Member Orientation",
-    subtitle: "General Members",
-    instructor: "Afua Atiase",
-    code: "NCBW-100",
-    image:
-      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80",
-    status: "Draft",
-  },
-];
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/api/training`;
 
-function CardViewIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <rect x="1.5" y="1.5" width="6" height="6" rx="1.2" fill="currentColor" />
-      <rect x="10.5" y="1.5" width="6" height="6" rx="1.2" fill="currentColor" />
-      <rect x="1.5" y="10.5" width="6" height="6" rx="1.2" fill="currentColor" />
-      <rect x="10.5" y="10.5" width="6" height="6" rx="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
-function ListViewIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <rect x="1.5" y="2" width="3" height="3" rx="0.8" fill="currentColor" />
-      <rect x="6.5" y="2.3" width="10" height="2.4" rx="1.2" fill="currentColor" />
-      <rect x="1.5" y="7.5" width="3" height="3" rx="0.8" fill="currentColor" />
-      <rect x="6.5" y="7.8" width="10" height="2.4" rx="1.2" fill="currentColor" />
-      <rect x="1.5" y="13" width="3" height="3" rx="0.8" fill="currentColor" />
-      <rect x="6.5" y="13.3" width="10" height="2.4" rx="1.2" fill="currentColor" />
-    </svg>
-  );
-}
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80";
 
 export default function InstructorCourses() {
   const [viewMode, setViewMode] = useState("cards");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const token = 
+            localStorage.getItem("access") ||
+            localStorage.getItem(access_token) ||
+            "";
+            
+        const response = await fetch(`${API_BASE}/instructor/courses/`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load instructor courses.");
+        }
+
+        const data = await response.json();
+        setCourses(data);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load courses.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   const filteredCourses = useMemo(() => {
     let result = [...courses];
@@ -97,23 +63,21 @@ export default function InstructorCourses() {
     if (value) {
       result = result.filter((course) => {
         return (
-          course.title.toLowerCase().includes(value) ||
-          course.subtitle.toLowerCase().includes(value) ||
-          course.code.toLowerCase().includes(value) ||
-          course.status.toLowerCase().includes(value)
+          (course.title || course.name || "").toLowerCase().includes(value) ||
+          (course.subtitle || "").toLowerCase().includes(value) ||
+          (course.code || "").toLowerCase().includes(value) ||
+          (course.status || "").toLowerCase().includes(value)
         );
       });
     }
 
     return result;
-  }, [searchTerm, statusFilter]);
+  }, [courses, searchTerm, statusFilter]);
 
   const showSearchResults = searchTerm.trim().length > 0;
 
   return (
-    <InstructorLayout
-      breadcrumbs={[{ label: "My Courses", path: "/instructor/courses" }]}
-    >
+    <InstructorLayout breadcrumbs={[{ label: "My Courses", path: "/instructor/courses" }]}>
       <div className="courses-page">
         <div className="courses-header">
           <h1 className="courses-title">My Courses</h1>
@@ -125,19 +89,15 @@ export default function InstructorCourses() {
               type="button"
               className={viewMode === "cards" ? "toggle-icon-btn active" : "toggle-icon-btn"}
               onClick={() => setViewMode("cards")}
-              title="Card view"
-              aria-label="Card view"
             >
-              <CardViewIcon />
+              ⊞
             </button>
             <button
               type="button"
               className={viewMode === "list" ? "toggle-icon-btn active" : "toggle-icon-btn"}
               onClick={() => setViewMode("list")}
-              title="List view"
-              aria-label="List view"
             >
-              <ListViewIcon />
+              ☰
             </button>
           </div>
 
@@ -168,11 +128,13 @@ export default function InstructorCourses() {
           </div>
         </div>
 
-        {showSearchResults && (
+        {loading && <p>Loading courses...</p>}
+        {error && <p>{error}</p>}
+        {!loading && !error && showSearchResults && (
           <p className="results-count">{filteredCourses.length} results</p>
         )}
 
-        {viewMode === "cards" ? (
+        {!loading && !error && viewMode === "cards" && (
           <div className="course-grid">
             {filteredCourses.map((course) => (
               <Link
@@ -183,23 +145,25 @@ export default function InstructorCourses() {
                 <div className="course-card">
                   <div
                     className="course-card-image"
-                    style={{ backgroundImage: `url(${course.image})` }}
+                    style={{ backgroundImage: `url(${course.image || FALLBACK_IMAGE})` }}
                   />
                   <div className="course-card-body">
                     <div className="course-card-top">
-                      <h3>{course.title}</h3>
-                      <span className={`status-pill ${course.status.toLowerCase()}`}>
+                      <h3>{course.title || course.name}</h3>
+                      <span className={`status-pill ${(course.status || "").toLowerCase()}`}>
                         {course.status}
                       </span>
                     </div>
-                    <p className="course-subtitle">{course.subtitle}</p>
-                    <p className="course-code">{course.code}</p>
+                    <p className="course-subtitle">{course.subtitle || "Unassigned"}</p>
+                    <p className="course-code">{course.code || ""}</p>
                   </div>
                 </div>
               </Link>
             ))}
           </div>
-        ) : (
+        )}
+
+        {!loading && !error && viewMode === "list" && (
           <div className="course-list">
             {filteredCourses.map((course) => (
               <Link
@@ -208,13 +172,13 @@ export default function InstructorCourses() {
                 className="course-list-link"
               >
                 <div className="course-list-row">
-                  <div className={`list-accent ${course.status.toLowerCase()}`} />
+                  <div className={`list-accent ${(course.status || "").toLowerCase()}`} />
                   <div className="course-list-content">
-                    <p className="list-code">{course.code}</p>
-                    <h3>{course.title}</h3>
+                    <p className="list-code">{course.code || ""}</p>
+                    <h3>{course.title || course.name}</h3>
                     <div className="list-meta">
-                      <span>{course.subtitle}</span>
-                      <span>{course.instructor}</span>
+                      <span>{course.subtitle || "Unassigned"}</span>
+                      <span>{course.instructor_name || ""}</span>
                       <span>{course.status}</span>
                     </div>
                   </div>

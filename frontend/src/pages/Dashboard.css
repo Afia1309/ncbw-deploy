@@ -611,11 +611,105 @@ body {
 .dash-stat-label {
   color: var(--dash-card-text-soft);
   font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .dash-stat-value {
   color: var(--dash-card-text);
   font-weight: 800;
+  font-size: 32px;
+  line-height: 1.1;
+  margin: 4px 0 2px;
+}
+
+.dash-stat-unit {
+  color: var(--dash-card-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Stat grid cards ────────────────────────────────────────────────────── */
+
+.dash-stat-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.dash-stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--dash-border);
+  gap: 2px;
+}
+
+.dash-stat-card:last-child {
+  border-bottom: none;
+}
+
+/* ── Activity stream ────────────────────────────────────────────────────── */
+
+.act-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.act-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  border-left-width: 3px;
+}
+
+.act-item__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.act-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.act-item__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act-item__course {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.act-view-btn {
+  padding: 5px 12px !important;
+  font-size: 12px !important;
+  flex-shrink: 0;
 }
 
 /* ===== Profile ===== */

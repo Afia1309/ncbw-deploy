@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import MemberLayout from "../../components/MemberLayout";
 import "./Dashboard.css";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
 export default function Certificate() {
   const navigate = useNavigate();
   const [certificate, setCertificate] = useState(null);
@@ -22,7 +24,7 @@ export default function Certificate() {
         return;
       }
 
-      const response = await fetch("http://127.0.0.1:8000/api/training/certificate/", {
+      const response = await fetch(`${API_BASE}/api/training/certificate/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -89,7 +91,7 @@ export default function Certificate() {
       try {
         const token = localStorage.getItem("access_token");
 
-        const response = await fetch("http://127.0.0.1:8000/api/training/certificate/pdf/", {
+        const response = await fetch(`${API_BASE}/api/training/certificate/pdf/`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

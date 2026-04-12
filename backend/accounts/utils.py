@@ -4,14 +4,33 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 
-def generate_member_id():
+ROLE_PREFIX = {
+    "admin": "A",
+    "instructor": "I",
+    "trainee": "N",
+}
+
+
+def generate_user_id(role="trainee"):
     """
-    Generate a unique member ID in the format NXXXXXXXX.
+    Generate a unique user ID with a role-based prefix.
+      Admin      → A + 8 random digits  (e.g. A34865735)
+      Instructor → I + 8 random digits  (e.g. I34865735)
+      Trainee    → N + 8 random digits  (e.g. N34865735)
+
+    Random rather than sequential: avoids exposing user counts,
+    prevents enumeration, and works safely in concurrent environments.
     """
+    prefix = ROLE_PREFIX.get(role, "N")
     while True:
-        candidate = f"N{random.randint(10000000, 99999999)}"
+        candidate = f"{prefix}{random.randint(10000000, 99999999)}"
         if not User.objects.filter(username=candidate).exists():
             return candidate
+
+
+def generate_member_id():
+    """Backwards-compat alias — generates a trainee (N-prefix) ID."""
+    return generate_user_id("trainee")
 
 
 def send_postmark_email(to_email, subject, html_body, text_body=""):

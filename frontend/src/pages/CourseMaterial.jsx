@@ -1,223 +1,630 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MemberLayout from "../../components/MemberLayout";
+import { parseVideoUrl } from "../utils/videoUtils";
 import "./Dashboard.css";
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000");
+
+function getToken() {
+  return localStorage.getItem("access_token") || localStorage.getItem("access");
+}
+
+function getItemType(item) {
+  return String(item?.item_type || "").toLowerCase();
+}
+
+// ── Clean SVG icon set ────────────────────────────────────────────────────────
+
+function IconPlay() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function IconDocument() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  );
+}
+
+function IconLink() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+function IconText() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="17" y1="10" x2="3" y2="10" />
+      <line x1="21" y1="6" x2="3" y2="6" />
+      <line x1="21" y1="14" x2="3" y2="14" />
+      <line x1="17" y1="18" x2="3" y2="18" />
+    </svg>
+  );
+}
+
+function IconQuiz() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 11 12 14 22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  );
+}
+
+function IconExternalLink() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+function IconArrowLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function IconArrowRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function ItemTypeIcon({ item }) {
+  const type = getItemType(item);
+  const map = {
+    video: <IconPlay />,
+    external_video: <IconPlay />,
+    pdf: <IconDocument />,
+    text: <IconText />,
+    link: <IconLink />,
+    quiz: <IconQuiz />,
+  };
+  return map[type] ?? null;
+}
+
+// ── Progress circle ───────────────────────────────────────────────────────────
+
+function ProgressCircle({ status, onClick, clickable = false }) {
+  const btnStyle = {
+    width: 20,
+    height: 20,
+    minWidth: 20,
+    padding: 0,
+    border: "none",
+    background: "transparent",
+    cursor: clickable ? "pointer" : "default",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
+
+  let inner;
+  if (status === "completed") {
+    inner = (
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="white" stroke="#16a34a" strokeWidth="2" />
+        <polyline points="6 10 9 13 14 7" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  } else if (status === "in_progress") {
+    inner = (
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="white" stroke="#e4e7ec" strokeWidth="2" />
+        {/* right half arc — indicates partial progress */}
+        <path d="M 10 2 A 8 8 0 0 1 10 18" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  } else {
+    inner = (
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="white" stroke="#c5ccd8" strokeWidth="2" />
+      </svg>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }}
+      style={btnStyle}
+      aria-label={status === "completed" ? "Mark incomplete" : "Mark complete"}
+      title={status === "completed" ? "Click to unmark" : "Click to mark complete"}
+    >
+      {inner}
+    </button>
+  );
+}
+
+// ── Video renderer ────────────────────────────────────────────────────────────
+
+function ExternalVideoPlayer({ url }) {
+  const parsed = parseVideoUrl(url);
+
+  if (parsed.canEmbed && parsed.embedUrl) {
+    return (
+      <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: "12px", overflow: "hidden", background: "#000" }}>
+        <iframe
+          src={parsed.embedUrl}
+          title="Video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+        />
+      </div>
+    );
+  }
+
+  // Unknown provider — clean link card
+  return (
+    <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" }}>
+      <div style={{
+        height: "160px",
+        background: "linear-gradient(135deg, #e4e7ec 0%, #d0d5dd 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <div style={{
+          width: 52,
+          height: 52,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.85)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#344054"><path d="M8 5v14l11-7z" /></svg>
+        </div>
+      </div>
+      <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: "0.85rem", color: "#667085", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>
+          {url}
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="primary-btn"
+          style={{ textDecoration: "none", fontSize: "0.875rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+        >
+          Watch <IconExternalLink />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ── Progress updater ──────────────────────────────────────────────────────────
+
+async function updateItemStatus(itemId, status, token) {
+  const response = await fetch(`${API_BASE}/api/training/items/${itemId}/progress/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) throw new Error("Could not update progress");
+  return response.json();
+}
+
+function renderTextWithBreaks(text) {
+  return String(text || "").split("\n").map((line, i) => (
+    <p key={i} style={{ marginBottom: "10px", lineHeight: "1.7" }}>{line || "\u00A0"}</p>
+  ));
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function CourseMaterial() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [module, setModule] = useState(null);
+  const [item, setItem] = useState(location.state?.item || null);
+  const [courseTitle, setCourseTitle] = useState(location.state?.courseTitle || "");
+  const [moduleTitle, setModuleTitle] = useState(location.state?.moduleTitle || "");
+  const [moduleId, setModuleId] = useState(location.state?.moduleId || null);
+  const [courseId, setCourseId] = useState(location.state?.courseId || null);
+  const [moduleItems, setModuleItems] = useState(location.state?.moduleItems || []);
   const [loading, setLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
 
+  useEffect(() => { fetchItemDetails(); }, [id]);
+
+  // Auto-mark in_progress on first open
   useEffect(() => {
-    fetchModuleDetails();
-  }, [id]);
+    if (!item || item.status !== "not_started") return;
+    const markStarted = async () => {
+      try {
+        const token = getToken();
+        const result = await updateItemStatus(item.id, "in_progress", token);
+        setItem((prev) => ({ ...prev, status: result.status }));
+        setModuleItems((prev) =>
+          prev.map((e) => String(e.id) === String(item.id) ? { ...e, status: result.status } : e)
+        );
+      } catch { /* silent */ }
+    };
+    markStarted();
+  }, [item?.id]);
 
-  const fetchModuleDetails = async () => {
+  const fetchItemDetails = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
+      if (!token) { navigate("/login"); return; }
 
-      if (!token) {
+      if (location.state?.item && location.state?.moduleItems && location.state?.courseId) {
+        setLoading(false);
+        return;
+      }
+
+      const courseIdFromPath = location.state?.courseId;
+      if (!courseIdFromPath) throw new Error("Please open this material from the course page.");
+
+      const response = await fetch(`${API_BASE}/api/training/courses/${courseIdFromPath}/`, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+
+      if (response.status === 401) {
+        ["access", "access_token", "refresh", "refresh_token"].forEach((k) => localStorage.removeItem(k));
         navigate("/login");
         return;
       }
 
-      const response = await fetch("http://localhost:8000/api/training/dashboard/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      if (!response.ok) throw new Error("Failed to fetch course material");
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch module details");
+      const course = await response.json();
+      const modules = Array.isArray(course?.modules) ? course.modules : [];
+      let foundItem = null, foundModuleTitle = "", foundModuleId = null, foundModuleItems = [];
+
+      for (const module of modules) {
+        const items = Array.isArray(module?.items) ? module.items : [];
+        const matched = items.find((e) => String(e.id) === String(id));
+        if (matched) {
+          foundItem = matched;
+          foundModuleTitle = module.title || "";
+          foundModuleId = module.id || null;
+          foundModuleItems = items;
+          break;
+        }
       }
 
-      const data = await response.json();
-      const foundModule = data.required_modules.find((moduleItem) => moduleItem.id === parseInt(id, 10));
+      if (!foundItem) throw new Error("Course material not found");
 
-      if (!foundModule) {
-        throw new Error("Module not found");
-      }
-
-      setModule(foundModule);
-      setError("");
+      setItem(foundItem);
+      setCourseTitle(course.title || "");
+      setModuleTitle(foundModuleTitle);
+      setModuleId(foundModuleId);
+      setCourseId(course.id || null);
+      setModuleItems(foundModuleItems);
     } catch (err) {
-      console.error("Failed to fetch module:", err);
       setError(err.message || "Failed to load course material.");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateModuleStatus = async (newStatus) => {
+  const moduleProgress = useMemo(() => {
+    const total = moduleItems.length;
+    const completed = moduleItems.filter((e) => e?.status === "completed").length;
+    return { total, completed, percent: total > 0 ? Math.round((completed / total) * 100) : 0 };
+  }, [moduleItems]);
+
+  const currentIndex = useMemo(
+    () => moduleItems.findIndex((e) => String(e.id) === String(id)),
+    [moduleItems, id]
+  );
+  const previousItem = currentIndex > 0 ? moduleItems[currentIndex - 1] : null;
+  const nextItem = currentIndex >= 0 && currentIndex < moduleItems.length - 1 ? moduleItems[currentIndex + 1] : null;
+
+  const goToItem = (target) => {
+    if (!target) return;
+    navigate(`/member/material/${target.id}`, {
+      state: { item: target, moduleTitle, moduleId, courseTitle, courseId, moduleItems },
+    });
+    setItem(target);
+    setStatusMessage("");
+    setError("");
+  };
+
+  const toggleItemStatus = async (itemId = id) => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
+      const current = moduleItems.find((e) => String(e.id) === String(itemId));
+      const next = current?.status === "completed" ? "in_progress" : "completed";
+      const result = await updateItemStatus(itemId, next, token);
 
-      const response = await fetch(
-        `http://localhost:8000/api/training/modules/${id}/status/`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: newStatus }),
-        }
+      setItem((prev) => String(prev?.id) === String(itemId) ? { ...prev, status: result.status } : prev);
+      setModuleItems((prev) =>
+        prev.map((e) => String(e.id) === String(itemId) ? { ...e, status: result.status } : e)
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to update module status");
-      }
-
-      setStatusMessage(
-        newStatus === "completed"
-          ? "Module marked as completed."
-          : "Module started successfully."
-      );
-
-      fetchModuleDetails();
-    } catch (err) {
-      console.error("Failed to update status:", err);
-      setStatusMessage("");
-      setError("Could not update this module right now.");
+      setStatusMessage(result.status === "completed" ? "Marked as complete." : "Marked as in progress.");
+      window.setTimeout(() => setStatusMessage(""), 1800);
+    } catch {
+      setError("Could not update progress. Please try again.");
     }
   };
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case "completed":
-        return "Completed";
-      case "in_progress":
-        return "In Progress";
-      default:
-        return "Not Started";
-    }
-  };
+  if (loading) return <MemberLayout title="Loading..."><div className="dash-loading">Loading...</div></MemberLayout>;
+  if (error && !item) return <MemberLayout title="Course Material"><div className="dash-error">{error}</div></MemberLayout>;
+  if (!item) return null;
 
-  if (loading) {
-    return (
-      <MemberLayout title="Loading...">
-        <div className="dash-loading">Loading course material...</div>
-      </MemberLayout>
-    );
-  }
-
-  if (error && !module) {
-    return (
-      <MemberLayout title="Course Material">
-        <div className="dash-error">{error}</div>
-      </MemberLayout>
-    );
-  }
-
-  const isLocked = module?.locked;
-  const isComplete = module?.status === "completed";
-  const isInProgress = module?.status === "in_progress";
-  const progress = isComplete ? 100 : isInProgress ? 50 : 0;
+  const itemTitle = item?.title || "Course Material";
+  const itemType = getItemType(item);
 
   return (
-    <MemberLayout title={module.title}>
-      <div className="course-material-grid">
-        <aside className="material-sidebar">
-          <div className="material-sidebar-title">Course Information</div>
+    <MemberLayout title={courseTitle || itemTitle}>
+      {statusMessage && <div className="dash-success" style={{ marginBottom: "10px" }}>{statusMessage}</div>}
+      {error && item && <div className="dash-error" style={{ marginBottom: "10px" }}>{error}</div>}
 
-          <div className="sidebar-section-item">
-            <span>Status</span>
-            <span className={`dash-status-badge ${module.status}`}>
-              {getStatusLabel(module.status)}
-            </span>
-          </div>
-
-          <div className="sidebar-section-item">
-            <span>Required</span>
-            <span>{module.required ? "Yes" : "No"}</span>
-          </div>
-
-          <div className="sidebar-section-item">
-            <span>Progress</span>
-            <span>{progress}% Complete</span>
-          </div>
-
-          {module.due_date && (
-            <div className="sidebar-section-item">
-              <span>Due Date</span>
-              <span>{new Date(module.due_date).toLocaleDateString()}</span>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "252px minmax(0, 1fr)",
+        border: "1px solid #e4e7ec",
+        borderRadius: "16px",
+        overflow: "hidden",
+        background: "#fff",
+        minHeight: "72vh",
+      }}>
+        {/* ── Sidebar ── */}
+        <aside style={{
+          borderRight: "1px solid #eaecf0",
+          background: "#fafafa",
+          display: "flex",
+          flexDirection: "column",
+        }}>
+          {/* Sidebar header */}
+          <div style={{ padding: "14px 16px 12px" }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#98a2b3", marginBottom: "8px" }}>
+              Contents
             </div>
-          )}
-
-          <div className="material-progress-group">
-            <div className="course-progress-bar">
-              <div
-                className={`course-progress-fill ${module.status}`}
-                style={{ width: `${progress}%` }}
-              />
+            <div style={{ fontSize: "0.78rem", color: "#667085", marginBottom: "6px" }}>
+              {moduleProgress.completed}/{moduleProgress.total} completed
             </div>
+            <div style={{ width: "100%", height: 3, background: "#e4e7ec", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ width: `${moduleProgress.percent}%`, height: "100%", background: "#16a34a", transition: "width 0.3s" }} />
+            </div>
+          </div>
+
+          {/* Sidebar items */}
+          <div style={{ borderTop: "1px solid #eaecf0", overflowY: "auto", flex: 1 }}>
+            {moduleItems.map((entry) => {
+              const active = String(entry.id) === String(id);
+              return (
+                <div
+                  key={entry.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => goToItem(entry)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") goToItem(entry); }}
+                  style={{
+                    borderLeft: active ? "3px solid #a855f7" : "3px solid transparent",
+                    background: active ? "#f3f0ff" : "transparent",
+                    padding: "10px 14px",
+                    display: "grid",
+                    gridTemplateColumns: "20px 16px minmax(0, 1fr)",
+                    gap: "8px",
+                    alignItems: "start",
+                    cursor: "pointer",
+                    transition: "background 0.1s",
+                  }}
+                >
+                  <ProgressCircle
+                    status={entry.status}
+                    clickable
+                    onClick={() => toggleItemStatus(entry.id)}
+                  />
+                  <div style={{ color: "#667085", display: "flex", alignItems: "center", paddingTop: "1px" }}>
+                    <ItemTypeIcon item={entry} />
+                  </div>
+                  <div style={{ fontSize: "0.84rem", fontWeight: active ? 600 : 400, color: active ? "#1e1b4b" : "#344054", lineHeight: 1.4, wordBreak: "break-word" }}>
+                    {entry.title || "Untitled"}
+                    {entry.due_date && (
+                      <div style={{ fontSize: "0.72rem", color: "#98a2b3", marginTop: "2px" }}>
+                        Due {new Date(entry.due_date).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </aside>
 
-        <div className="material-main">
-          {statusMessage && <div className="dash-success">{statusMessage}</div>}
-          {error && module && <div className="dash-error">{error}</div>}
+        {/* ── Content area ── */}
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* Top nav bar */}
+          <div style={{
+            padding: "10px 16px",
+            borderBottom: "1px solid #eaecf0",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            background: "#fff",
+          }}>
+            {/* Breadcrumb */}
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "#98a2b3" }}>{moduleTitle || "Module"}</div>
+              <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#142c5c" }}>{itemTitle}</div>
+            </div>
 
-          <div className="material-video">
-            <div className="material-video-placeholder">
-              <div className="material-video-icon">▶</div>
-              <div className="material-video-title">{module.title}</div>
-              <div className="material-video-subtext">
-                Video and reading materials will appear here.
-              </div>
+            {/* Navigation controls */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <button
+                type="button"
+                onClick={() => navigate(`/member/course/${courseId}`)}
+                style={{
+                  border: "1px solid #e4e7ec",
+                  background: "#fff",
+                  color: "#344054",
+                  borderRadius: "8px",
+                  padding: "6px 12px",
+                  fontSize: "0.82rem",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ← Course
+              </button>
+
+              <button
+                type="button"
+                disabled={!previousItem}
+                onClick={() => goToItem(previousItem)}
+                title={previousItem ? `Previous: ${previousItem.title}` : "No previous item"}
+                style={{
+                  border: "1px solid #e4e7ec",
+                  background: !previousItem ? "#f9fafb" : "#fff",
+                  color: !previousItem ? "#c5ccd8" : "#344054",
+                  borderRadius: "8px",
+                  width: 34,
+                  height: 34,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: !previousItem ? "not-allowed" : "pointer",
+                  padding: 0,
+                }}
+              >
+                <IconArrowLeft />
+              </button>
+
+              <button
+                type="button"
+                disabled={!nextItem}
+                onClick={() => goToItem(nextItem)}
+                title={nextItem ? `Next: ${nextItem.title}` : "No next item"}
+                style={{
+                  border: "1px solid #e4e7ec",
+                  background: !nextItem ? "#f9fafb" : "#fff",
+                  color: !nextItem ? "#c5ccd8" : "#344054",
+                  borderRadius: "8px",
+                  width: 34,
+                  height: 34,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: !nextItem ? "not-allowed" : "pointer",
+                  padding: 0,
+                }}
+              >
+                <IconArrowRight />
+              </button>
             </div>
           </div>
 
-          <div className="material-actions">
-            {!isLocked && !isComplete && (
-              <button
-                className="primary-btn"
-                onClick={() =>
-                  updateModuleStatus(isInProgress ? "completed" : "in_progress")
-                }
-              >
-                {isInProgress ? "Mark Complete" : "Start Module"}
-              </button>
-            )}
-
-            {isComplete && (
-              <button className="secondary-btn" disabled>
-                Completed
-              </button>
-            )}
-
-            {isLocked && (
-              <button className="disabled-btn" disabled>
-                Locked
-              </button>
-            )}
-
-            <button
-              className="secondary-btn"
-              type="button"
-              onClick={() => navigate(`/member/course/${module.id}`)}
-            >
-              Back to Course Details
-            </button>
-          </div>
-
-          <div className="material-description">
-            <h3>About this course</h3>
-            <p>
-              This module covers essential concepts in {module.title}. Complete the
-              required activities to master this topic.
-            </p>
-
-            {isLocked && (
-              <div className="material-note">
-                This course is currently locked. Complete the previous module to
-                unlock access.
+          {/* Content body */}
+          <div style={{ padding: "20px", minWidth: 0 }}>
+            {/* Item header */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "16px" }}>
+              <div style={{ paddingTop: "3px" }}>
+                <ProgressCircle
+                  status={item.status}
+                  clickable
+                  onClick={() => toggleItemStatus(item.id)}
+                />
               </div>
+              <div>
+                <h1 style={{ fontSize: "1.3rem", fontWeight: 600, color: "#142c5c", margin: 0, lineHeight: 1.3 }}>
+                  {itemTitle}
+                </h1>
+                {item?.due_date && (
+                  <div style={{ fontSize: "0.78rem", color: "#98a2b3", marginTop: "3px" }}>
+                    Due: {new Date(item.due_date).toLocaleDateString()}
+                  </div>
+                )}
+                <div style={{ fontSize: "0.78rem", color: "#98a2b3", marginTop: "2px" }}>
+                  {item.status === "completed" ? "✓ Completed" : item.status === "in_progress" ? "In progress" : "Not started"}
+                  {" · "}
+                  <button
+                    type="button"
+                    onClick={() => toggleItemStatus(item.id)}
+                    style={{ border: "none", background: "none", padding: 0, color: "#6366f1", cursor: "pointer", fontSize: "0.78rem", fontWeight: 500 }}
+                  >
+                    {item.status === "completed" ? "Unmark" : "Mark complete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Content renderer */}
+            {itemType === "video" && item?.file_url ? (
+              <div style={{ borderRadius: "12px", overflow: "hidden", background: "#000" }}>
+                <video controls style={{ width: "100%", maxHeight: "460px", display: "block" }} src={item.file_url}>
+                  Your browser does not support video playback.
+                </video>
+              </div>
+
+            ) : itemType === "external_video" && item?.external_url ? (
+              <ExternalVideoPlayer url={item.external_url} />
+
+            ) : itemType === "pdf" && item?.file_url ? (
+              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px", background: "#fafafa", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                <div style={{ color: "#667085" }}><IconDocument /></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.85rem", color: "#344054", fontWeight: 500 }}>PDF Document</div>
+                  <div style={{ fontSize: "0.78rem", color: "#98a2b3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.file_url.split("/").pop()}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <a href={item.file_url} target="_blank" rel="noreferrer" className="primary-btn"
+                    style={{ textDecoration: "none", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                    Open <IconExternalLink />
+                  </a>
+                  <a href={item.file_url} download className="secondary-btn"
+                    style={{ textDecoration: "none", fontSize: "0.85rem" }}>
+                    Download
+                  </a>
+                </div>
+              </div>
+
+            ) : itemType === "link" && item?.external_url ? (
+              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "16px 18px", background: "#fafafa", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ color: "#667085" }}><IconLink /></div>
+                <div style={{ flex: 1, fontSize: "0.85rem", color: "#344054", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {item.external_url}
+                </div>
+                <a href={item.external_url} target="_blank" rel="noreferrer" className="primary-btn"
+                  style={{ textDecoration: "none", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap" }}>
+                  Open Link <IconExternalLink />
+                </a>
+              </div>
+
+            ) : itemType === "text" ? (
+              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px 20px", background: "#fff", color: "#344054", fontSize: "0.95rem", lineHeight: 1.75 }}>
+                {renderTextWithBreaks(item?.text_content || "")}
+              </div>
+
+            ) : itemType === "quiz" ? (
+              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px 20px", background: "#fff" }}>
+                <div style={{ color: "#344054", fontSize: "0.95rem" }}>Quiz content will appear here.</div>
+              </div>
+
+            ) : (
+              <div className="dash-empty-panel">No content available for this item yet.</div>
             )}
           </div>
         </div>

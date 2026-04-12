@@ -1,4 +1,5 @@
-const API = "http://127.0.0.1:8000/api/notifications/";
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API = `${BASE}/api/notifications/`;
 
 // Fetch all notifications
 export async function fetchNotifications(token) {

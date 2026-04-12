@@ -2,45 +2,53 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+
 from .models import Notification
 from .serializers import NotificationSerializer
+from .utils import check_due_date_notifications
 
-# Notifiication List (by individual user)
+
 class NotificationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifications = Notification.objects.filter(
-            user=request.user
-        ).order_by('-created_at') # Newest first
+        # Check and create any due-date notifications before returning the list
+        if hasattr(request.user, "profile") and request.user.profile.role == "trainee":
+            try:
+                check_due_date_notifications(request.user)
+            except Exception:
+                pass  # Never let notification checks break the response
 
+        notifications = (
+            Notification.objects.filter(user=request.user)
+            .select_related("course")
+            .order_by("-created_at")
+        )
         serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data)
 
-# Mark notifications as read
+
 class MarkNotificationReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id):
-        notification = get_object_or_404(
-            Notification,
-            id=id,
-            user=request.user
-        )
-
+        notification = get_object_or_404(Notification, id=id, user=request.user)
         notification.is_read = True
-        notification.save()
-
+        notification.save(update_fields=["is_read"])
         return Response({"status": "read"})
 
-# Unread notification count
+
+class MarkAllNotificationsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({"status": "all_read"})
+
+
 class UnreadNotificationCountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        count = Notification.objects.filter(
-            user=request.user,
-            is_read=False
-        ).count()
-
+        count = Notification.objects.filter(user=request.user, is_read=False).count()
         return Response({"unread": count})
