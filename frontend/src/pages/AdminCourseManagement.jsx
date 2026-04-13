@@ -17,7 +17,7 @@ export default function AdminCourseManagement() {
     description: "",
     instructor: "",
     openDate: "",
-    status: "Open",
+    status: "Draft",
   });
 
   function getAuthHeaders() {
@@ -88,7 +88,7 @@ export default function AdminCourseManagement() {
       description: "",
       instructor: instructors.length > 0 ? String(instructors[0].id) : "",
       openDate: "",
-      status: "Open",
+      status: "Draft",
     });
     setShowModal(true);
   }
@@ -245,7 +245,7 @@ export default function AdminCourseManagement() {
                       <td>
                         <span
                           className={`course-status ${
-                            course.status === "Open" ? "status-open" : "status-draft"
+                            course.status === "Draft" ? "status-open" : "status-draft"
                           }`}
                         >
                           {course.status}
