@@ -70,6 +70,10 @@ export default function InstructorSidebar() {
             My Courses
           </Link>
 
+          <Link to="/instructor/profile" style={navItem("/instructor/profile")}>
+            Profile
+          </Link>
+
           <Link to="/instructor/notifications" style={navItem("/instructor/notifications")}>
             <span>Notifications</span>
             {unread > 0 && (
@@ -86,10 +90,6 @@ export default function InstructorSidebar() {
                 {unread > 99 ? "99+" : unread}
               </span>
             )}
-          </Link>
-
-          <Link to="/instructor/profile" style={navItem("/instructor/profile")}>
-            Profile
           </Link>
         </nav>
       </div>
