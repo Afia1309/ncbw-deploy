@@ -240,6 +240,9 @@ export default function CourseMaterial() {
   const location = useLocation();
 
   const [item, setItem] = useState(location.state?.item || null);
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [score, setScore] = useState(null);
   const [courseTitle, setCourseTitle] = useState(location.state?.courseTitle || "");
   const [moduleTitle, setModuleTitle] = useState(location.state?.moduleTitle || "");
   const [moduleId, setModuleId] = useState(location.state?.moduleId || null);
@@ -310,7 +313,10 @@ export default function CourseMaterial() {
 
       if (!foundItem) throw new Error("Course material not found");
 
-      setItem(foundItem);
+      setItem({
+        ...foundItem,
+        quiz_data: foundItem.quiz_data || location.state?.item?.quiz_data
+      });
       setCourseTitle(course.title || "");
       setModuleTitle(foundModuleTitle);
       setModuleId(foundModuleId);
@@ -362,6 +368,60 @@ export default function CourseMaterial() {
     } catch {
       setError("Could not update progress. Please try again.");
     }
+  };
+
+  const handleSelect = (questionId, optionId) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: optionId,
+    }));
+  };
+
+  const handleSubmitQuiz = async () => {
+    if (!item?.quiz_data?.questions) return;
+
+    let correct = 0;
+    const total = item.quiz_data.questions.length;
+
+    item.quiz_data.questions.forEach((q) => {
+      if (answers[q.id] === q.correctOptionId) {
+        correct += 1;
+      }
+    });
+
+    const percent = Math.round((correct / total) * 100);
+    const passed = percent >= item.quiz_data.passingGrade;
+
+    setScore({
+      correct,
+      total,
+      percent,
+      passed: percent >= item.quiz_data.passingGrade,
+    });
+    
+    setSubmitted(true);
+
+    {/* Automatically mark as completed if passing grade is recieved */}
+    try {
+      const token = getToken();
+      const newStatus = passed ? "completed" : "in_progress";
+      await updateItemStatus(item.id, newStatus, token);
+    } catch (err) {
+      console.error("Failed to update item status:", err);
+    }
+
+    console.log("Submitting quiz...");
+    console.log("Quiz Result:", {
+      correct,
+      total,
+      percent,
+    });
+  };
+
+  const handleRetakeQuiz = () => {
+    setAnswers({});
+    setSubmitted(false);
+    setScore(null);
   };
 
   if (loading) return <MemberLayout title="Loading..."><div className="dash-loading">Loading...</div></MemberLayout>;
@@ -619,13 +679,91 @@ export default function CourseMaterial() {
               </div>
 
             ) : itemType === "quiz" ? (
-              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px 20px", background: "#fff" }}>
-                <div style={{ color: "#344054", fontSize: "0.95rem" }}>Quiz content will appear here.</div>
-              </div>
+              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px 20px" }}>
 
-            ) : (
-              <div className="dash-empty-panel">No content available for this item yet.</div>
-            )}
+                {item?.quiz_data?.questions?.length ? (
+                  <>
+                    {item.quiz_data.questions.map((q, qIndex) => (
+                      <div key={q.id || qIndex} style={{ marginBottom: "20px" }}>
+
+                        <div style={{ fontWeight: "600", marginBottom: "10px" }}>
+                          {qIndex + 1}. {q.prompt}
+                        </div>
+
+                        {q.options.map((opt) => (
+                          <label
+                            key={opt.id}
+                            style={{ display: "block", marginBottom: "6px", cursor: "pointer" }}
+                          >
+                            <input
+                              type="radio"
+                              name={`question-${q.id}`}
+                              value={opt.id}
+                              checked={answers[q.id] === opt.id}
+                              onChange={() => handleSelect(q.id, opt.id)}
+                              style={{ marginRight: "8px" }}
+                            />
+                            {opt.text}
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+
+                    {!submitted && (
+                      <button
+                        onClick={handleSubmitQuiz}
+                        disabled={submitted}
+                        style={{
+                          marginTop: "10px",
+                          padding: "8px 14px",
+                          borderRadius: "8px",
+                          border: "1px solid #e4e7ec",
+                          background: "#2563eb",
+                          color: "white",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Submit Quiz
+                      </button>
+                    )}
+
+                    {submitted && score && (
+                      <div style={{ marginTop: "15px" }}>
+                        <h3>Results</h3>
+
+                        <p>
+                          Score: {score.correct} / {score.total} ({score.percent}%)
+                        </p>
+
+                        <p style={{ color: score.passed ? "green" : "red" }}>
+                          {score.passed ? "Passed! " : "Did not pass "}
+                        </p>
+
+                        <button
+                          onClick={handleRetakeQuiz}
+                          style={{
+                            marginTop: "10px",
+                            padding: "8px 14px",
+                            borderRadius: "8px",
+                            border: "1px solid #e4e7ec",
+                            background: "#f3f4f6",
+                            color: "#111",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Retake Quiz
+                        </button>
+
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div>No quiz questions available.</div>
+                )}
+            </div>
+          ) : (
+            <div className="dash-empty-panel">No content available for this item yet.</div>
+          )}
           </div>
         </div>
       </div>
