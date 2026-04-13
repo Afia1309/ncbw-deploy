@@ -17,7 +17,7 @@ export default function AdminCourseManagement() {
     description: "",
     instructor: "",
     openDate: "",
-    status: "Open",
+    status: "Draft",
   });
 
   function getAuthHeaders() {
@@ -88,7 +88,7 @@ export default function AdminCourseManagement() {
       description: "",
       instructor: instructors.length > 0 ? String(instructors[0].id) : "",
       openDate: "",
-      status: "Open",
+      status: "Draft",
     });
     setShowModal(true);
   }
@@ -155,7 +155,7 @@ export default function AdminCourseManagement() {
       const response = await fetch(`${API_BASE}/admin/courses/${courseId}/`, {
         method: "DELETE",
         headers: getAuthHeaders(),
-     });
+      });
 
       let data = {};
       const contentType = response.headers.get("content-type");
@@ -182,6 +182,12 @@ export default function AdminCourseManagement() {
       day: "numeric",
       year: "numeric",
     });
+  }
+
+  function getStatusClass(status) {
+    if (status === "Published") return "status-published";
+    if (status === "Draft") return "status-draft";
+    return "status-draft";
   }
 
   if (loading) {
@@ -243,11 +249,7 @@ export default function AdminCourseManagement() {
                       <td>{course.instructor_name}</td>
                       <td>{course.enrollment}</td>
                       <td>
-                        <span
-                          className={`course-status ${
-                            course.status === "Open" ? "status-open" : "status-draft"
-                          }`}
-                        >
+                        <span className={`course-status ${getStatusClass(course.status)}`}>
                           {course.status}
                         </span>
                       </td>
