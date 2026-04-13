@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-const API_BASE = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/api`;
+const API_BASE = `${
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+}/api`;
 
 function getToken() {
   return localStorage.getItem("access_token") || localStorage.getItem("access") || "";
@@ -19,8 +21,10 @@ export default function InstructorSidebar() {
     fetch(`${API_BASE}/notifications/unread-count/`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.unread !== undefined) setUnread(data.unread); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.unread !== undefined) setUnread(data.unread);
+      })
       .catch(() => {});
   }, [location.pathname]);
 
@@ -32,11 +36,16 @@ export default function InstructorSidebar() {
       if (refresh) {
         await fetch(`${API_BASE}/auth/logout/`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({ refresh }),
         });
       }
-    } catch { /* continue regardless */ }
+    } catch {
+      /* continue regardless */
+    }
 
     ["access_token", "access", "refresh_token", "refresh", "user"].forEach((k) =>
       localStorage.removeItem(k)
@@ -63,7 +72,7 @@ export default function InstructorSidebar() {
   return (
     <aside style={styles.sidebar}>
       <div>
-        <h1 style={styles.logo}>NCBW</h1>
+        <h1 style={styles.logo}>NCBW-QCMC</h1>
 
         <nav style={{ marginTop: "36px" }}>
           <Link to="/instructor/courses" style={navItem("/instructor/courses")}>
@@ -77,16 +86,18 @@ export default function InstructorSidebar() {
           <Link to="/instructor/notifications" style={navItem("/instructor/notifications")}>
             <span>Notifications</span>
             {unread > 0 && (
-              <span style={{
-                background: "#ef4444",
-                color: "#fff",
-                borderRadius: "999px",
-                fontSize: "11px",
-                fontWeight: 700,
-                padding: "1px 7px",
-                minWidth: 20,
-                textAlign: "center",
-              }}>
+              <span
+                style={{
+                  background: "#ef4444",
+                  color: "#fff",
+                  borderRadius: "999px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  padding: "1px 7px",
+                  minWidth: 20,
+                  textAlign: "center",
+                }}
+              >
                 {unread > 99 ? "99+" : unread}
               </span>
             )}
@@ -114,11 +125,11 @@ const styles = {
     boxSizing: "border-box",
   },
   logo: {
-    color: "#C9A227",
-    fontSize: "28px",
+    color: "#D4AF37",
+    fontSize: "24px",
     fontWeight: 800,
     margin: 0,
-    letterSpacing: "0.5px",
+    letterSpacing: "0.2px",
   },
   signOut: {
     border: "none",

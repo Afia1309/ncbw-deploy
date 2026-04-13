@@ -119,7 +119,7 @@
   font-weight: 600;
 }
 
-.status-open {
+.status-published {
   background: rgba(34, 197, 94, 0.12);
   color: #16a34a;
 }
@@ -259,7 +259,23 @@
     align-items: flex-start;
   }
 
+  .course-table-panel {
+    padding: 14px;
+  }
+
+  .modal-card {
+    padding: 22px;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-btn {
+    width: 100%;
   }
 }
