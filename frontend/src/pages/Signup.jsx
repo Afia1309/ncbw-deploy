@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import api from "../api/apiClient";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
 import "../Auth.css";
 import bgImage from "../assets/login-bg.jpg";
 
@@ -16,6 +16,9 @@ const POSITIONS = [
 
 export default function Signup() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const memberId = params.get("member_id");  
 
   const [role, setRole] = useState("trainee");
   const [firstName, setFirstName] = useState("");
@@ -28,6 +31,10 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agree, setAgree] = useState(false);
+
+  //const [searchParams] = useSearchParams();
+  //const invitedMemberId = searchParams.get("member_id");
+  //const isInvited = !!invitedMemberId;
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
@@ -54,6 +61,7 @@ export default function Signup() {
     setLoading(true);
     try {
       await api.post("/auth/register/", {
+        member_id: memberId,
         role,
         first_name: firstName,
         last_name: lastName,

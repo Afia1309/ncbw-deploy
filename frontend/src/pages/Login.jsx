@@ -140,9 +140,10 @@ export default function Login() {
             </div>
           )}
 
-          <div className="auth-footer">
+          {/* <div className="auth-footer">
             Don't have an account? <Link to="/signup">Create one here.</Link>
           </div>
+          */}
         </form>
       </div>
     </div>
