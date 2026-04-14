@@ -1,90 +1,170 @@
 import { useEffect, useState } from "react";
+import api from "../api/apiClient";
 import InstructorLayout from "../components/InstructorLayout";
-import "./InstructorProfile.css";
+import "./Dashboard.css";
+import "./ProfileShared.css";
 
-const API_BASE = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"}/api`;
-
-function getToken() {
-  return localStorage.getItem("access_token") || localStorage.getItem("access") || "";
+function splitName(fullName = "") {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" ") || "",
+  };
 }
 
-async function apiFetch(path, options = {}) {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw data;
-  return data;
+function mergeUpdatedProfile(previousProfile, payload) {
+  const updatedUser = payload?.user || payload || {};
+  const firstName = updatedUser.first_name ?? splitName(previousProfile?.name).firstName;
+  const lastName = updatedUser.last_name ?? splitName(previousProfile?.name).lastName;
+  const mergedName =
+    updatedUser.name ||
+    `${firstName} ${lastName}`.trim() ||
+    previousProfile?.name ||
+    "Instructor";
+
+  return {
+    ...previousProfile,
+    ...updatedUser,
+    name: mergedName,
+    email: updatedUser.email ?? previousProfile?.email ?? "",
+    phone: updatedUser.phone ?? previousProfile?.phone ?? "",
+  };
 }
 
-// ── Edit Account Modal ────────────────────────────────────────────────────────
+function EditProfileModal({ profile, onClose, onSaved }) {
+  const { firstName: initialFirstName, lastName: initialLastName } = splitName(profile?.name);
 
-function EditModal({ profile, onClose, onSaved }) {
-  const [firstName, setFirstName] = useState(profile.name?.split(" ")[0] || "");
-  const [lastName, setLastName] = useState(profile.name?.split(" ").slice(1).join(" ") || "");
-  const [email, setEmail] = useState(profile.email || "");
-  const [phone, setPhone] = useState(profile.phone || "");
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [email, setEmail] = useState(profile?.email || "");
+  const [phone, setPhone] = useState(profile?.phone || "");
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const getErrorText = (value) => {
+    if (Array.isArray(value)) return value[0];
+    return value;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setErrors({});
+
     try {
-      const data = await apiFetch("/auth/profile/", {
-        method: "PATCH",
-        body: JSON.stringify({ first_name: firstName, last_name: lastName, email, phone }),
+      const response = await api.patch("/auth/profile/", {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
       });
-      onSaved(data.user);
+
+      onSaved(response.data);
       onClose();
     } catch (err) {
-      setErrors(typeof err === "object" ? err : { detail: "Failed to save changes." });
+      setErrors(
+        err.response?.data && typeof err.response.data === "object"
+          ? err.response.data
+          : { detail: "Failed to save changes." }
+      );
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="ip-modal-overlay" onClick={onClose}>
-      <div className="ip-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="ip-modal-header">
-          <h2>Edit Account Info</h2>
-          <button type="button" className="ip-modal-close" onClick={onClose} aria-label="Close">×</button>
+    <div className="profile-modal-overlay" onClick={onClose}>
+      <div
+        className="profile-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="profile-modal-header">
+          <h2>Edit Profile</h2>
+          <button
+            type="button"
+            className="profile-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="ip-modal-form">
-          <div className="ip-modal-row">
-            <div className="ip-field">
+
+        <form onSubmit={handleSubmit} className="profile-modal-form">
+          <div className="profile-modal-row">
+            <div className="profile-modal-field">
               <label>First Name</label>
-              <input className="ip-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-              {errors.first_name && <span className="ip-field-error">{errors.first_name}</span>}
+              <input
+                className="profile-modal-input"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
+              {errors.first_name && (
+                <span className="profile-modal-error">{getErrorText(errors.first_name)}</span>
+              )}
             </div>
-            <div className="ip-field">
+
+            <div className="profile-modal-field">
               <label>Last Name</label>
-              <input className="ip-input" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-              {errors.last_name && <span className="ip-field-error">{errors.last_name}</span>}
+              <input
+                className="profile-modal-input"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+              />
+              {errors.last_name && (
+                <span className="profile-modal-error">{getErrorText(errors.last_name)}</span>
+              )}
             </div>
           </div>
-          <div className="ip-field">
+
+          <div className="profile-modal-field">
             <label>Email</label>
-            <input className="ip-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            {errors.email && <span className="ip-field-error">{Array.isArray(errors.email) ? errors.email[0] : errors.email}</span>}
+            <input
+              className="profile-modal-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            {errors.email && (
+              <span className="profile-modal-error">{getErrorText(errors.email)}</span>
+            )}
           </div>
-          <div className="ip-field">
+
+          <div className="profile-modal-field">
             <label>Phone</label>
-            <input className="ip-input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            {errors.phone && <span className="ip-field-error">{errors.phone}</span>}
+            <input
+              className="profile-modal-input"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            {errors.phone && (
+              <span className="profile-modal-error">{getErrorText(errors.phone)}</span>
+            )}
           </div>
-          {errors.detail && <p className="ip-field-error">{errors.detail}</p>}
-          <div className="ip-modal-actions">
-            <button type="button" className="secondary-profile-btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="primary-profile-btn" disabled={saving}>
+
+          {errors.detail && <p className="profile-modal-error">{getErrorText(errors.detail)}</p>}
+
+          <div className="profile-modal-actions">
+            <button
+              type="button"
+              className="profile-modal-cancel"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="profile-modal-confirm"
+              disabled={saving}
+            >
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
@@ -94,64 +174,135 @@ function EditModal({ profile, onClose, onSaved }) {
   );
 }
 
-// ── Change Password Modal ─────────────────────────────────────────────────────
-
-function PasswordModal({ onClose }) {
-  const [current, setCurrent] = useState("");
-  const [newPwd, setNewPwd] = useState("");
-  const [confirm, setConfirm] = useState("");
+function ChangePasswordModal({ onClose }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const getErrorText = (value) => {
+    if (Array.isArray(value)) return value[0];
+    return value;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setErrors({});
+
     try {
-      await apiFetch("/auth/change-password/", {
-        method: "POST",
-        body: JSON.stringify({ current_password: current, new_password: newPwd, confirm_password: confirm }),
+      await api.post("/auth/change-password/", {
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
       });
+
       setSuccess(true);
-      setTimeout(onClose, 1200);
+      setTimeout(() => {
+        onClose();
+      }, 1200);
     } catch (err) {
-      setErrors(typeof err === "object" ? err : { detail: "Failed to change password." });
+      setErrors(
+        err.response?.data && typeof err.response.data === "object"
+          ? err.response.data
+          : { detail: "Failed to change password." }
+      );
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="ip-modal-overlay" onClick={onClose}>
-      <div className="ip-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="ip-modal-header">
+    <div className="profile-modal-overlay" onClick={onClose}>
+      <div
+        className="profile-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="profile-modal-header">
           <h2>Change Password</h2>
-          <button type="button" className="ip-modal-close" onClick={onClose} aria-label="Close">×</button>
+          <button
+            type="button"
+            className="profile-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
+
         {success ? (
-          <p className="ip-success">Password changed successfully.</p>
+          <p className="profile-modal-success">Password changed successfully.</p>
         ) : (
-          <form onSubmit={handleSubmit} className="ip-modal-form">
-            <div className="ip-field">
+          <form onSubmit={handleSubmit} className="profile-modal-form">
+            <div className="profile-modal-field">
               <label>Current Password</label>
-              <input className="ip-input" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
-              {errors.current_password && <span className="ip-field-error">{Array.isArray(errors.current_password) ? errors.current_password[0] : errors.current_password}</span>}
+              <input
+                className="profile-modal-input"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+              {errors.current_password && (
+                <span className="profile-modal-error">
+                  {getErrorText(errors.current_password)}
+                </span>
+              )}
             </div>
-            <div className="ip-field">
+
+            <div className="profile-modal-field">
               <label>New Password</label>
-              <input className="ip-input" type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} required />
-              {errors.new_password && <span className="ip-field-error">{Array.isArray(errors.new_password) ? errors.new_password[0] : errors.new_password}</span>}
+              <input
+                className="profile-modal-input"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              {errors.new_password && (
+                <span className="profile-modal-error">
+                  {getErrorText(errors.new_password)}
+                </span>
+              )}
             </div>
-            <div className="ip-field">
+
+            <div className="profile-modal-field">
               <label>Confirm New Password</label>
-              <input className="ip-input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-              {errors.confirm_password && <span className="ip-field-error">{Array.isArray(errors.confirm_password) ? errors.confirm_password[0] : errors.confirm_password}</span>}
+              <input
+                className="profile-modal-input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              {errors.confirm_password && (
+                <span className="profile-modal-error">
+                  {getErrorText(errors.confirm_password)}
+                </span>
+              )}
             </div>
-            {errors.detail && <p className="ip-field-error">{errors.detail}</p>}
-            <div className="ip-modal-actions">
-              <button type="button" className="secondary-profile-btn" onClick={onClose}>Cancel</button>
-              <button type="submit" className="primary-profile-btn" disabled={saving}>
+
+            {errors.detail && (
+              <p className="profile-modal-error">{getErrorText(errors.detail)}</p>
+            )}
+
+            <div className="profile-modal-actions">
+              <button
+                type="button"
+                className="profile-modal-cancel"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="profile-modal-confirm"
+                disabled={saving}
+              >
                 {saving ? "Changing..." : "Change Password"}
               </button>
             </div>
@@ -162,96 +313,115 @@ function PasswordModal({ onClose }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
-
 export default function InstructorProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showEdit, setShowEdit] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
-    apiFetch("/training/me/")
-      .then(setProfile)
+    api
+      .get("/training/me/")
+      .then((response) => setProfile(response.data))
       .catch(() => setError("Failed to load profile."))
       .finally(() => setLoading(false));
   }, []);
 
-  const firstInitial = profile?.name?.charAt(0)?.toUpperCase() || "I";
-
-  const formatRole = (role) =>
-    role ? role.charAt(0).toUpperCase() + role.slice(1) : "Instructor";
+  const handleProfileSaved = (payload) => {
+    setProfile((prev) => mergeUpdatedProfile(prev, payload));
+  };
 
   return (
-    <InstructorLayout breadcrumbs={[{ label: "Profile", path: "/instructor/profile" }]}>
-      <div className="instructor-profile-page">
-        {loading ? (
-          <div style={{ color: "#667085", padding: "32px 0" }}>Loading profile...</div>
-        ) : error ? (
-          <div style={{ color: "#ef4444", padding: "32px 0" }}>{error}</div>
-        ) : (
-          <>
-            <div className="profile-hero">
-              <div className="profile-avatar">{firstInitial}</div>
-              <div className="profile-hero-text">
-                <h1>{profile.name}</h1>
-                <p>{profile.email}</p>
-                <span className="profile-role-pill">{formatRole(profile.role)}</span>
+    <InstructorLayout
+      breadcrumbs={[{ label: "Profile", path: "/instructor/profile" }]}
+    >
+      {loading ? (
+        <div className="dash-loading">Loading profile...</div>
+      ) : error ? (
+        <div className="dash-error">{error}</div>
+      ) : (
+        <div className="profile-wrapper profile-wrapper--wide">
+          <div className="profile-card">
+            <div className="profile-avatar-section">
+              <div className="profile-avatar-circle">
+                {profile?.name?.charAt(0) || profile?.member_id?.toString().charAt(0) || "I"}
               </div>
             </div>
 
-            <div className="profile-card">
-              <h2>Account Information</h2>
-              <div className="profile-info-list">
-                <div className="profile-info-row">
-                  <span>Account ID</span>
-                  <strong>{profile.member_id || "—"}</strong>
+            <div className="profile-info-section">
+              <div className="profile-header-block">
+                <div className="dash-eyebrow">Profile Information</div>
+                <h2 className="dash-block-title">{profile?.name || "Instructor"}</h2>
+                <p className="dash-subtext">
+                  Review your account details and keep your information up to date.
+                </p>
+              </div>
+
+              <div className="profile-field-grid">
+                <div className="profile-field">
+                  <span className="profile-label">Member ID</span>
+                  <span className="profile-value">{profile?.member_id || "—"}</span>
                 </div>
-                <div className="profile-info-row">
-                  <span>Email</span>
-                  <strong>{profile.email || "—"}</strong>
+
+                <div className="profile-field">
+                  <span className="profile-label">Full Name</span>
+                  <span className="profile-value">{profile?.name || "—"}</span>
                 </div>
-                <div className="profile-info-row">
-                  <span>Role</span>
-                  <strong>{formatRole(profile.role)}</strong>
+
+                <div className="profile-field">
+                  <span className="profile-label">Email</span>
+                  <span className="profile-value">{profile?.email || "—"}</span>
                 </div>
-                <div className="profile-info-row">
-                  <span>Position</span>
-                  <strong>{profile.position || "—"}</strong>
+
+                <div className="profile-field">
+                  <span className="profile-label">Phone</span>
+                  <span className="profile-value">{profile?.phone || "—"}</span>
                 </div>
-                <div className="profile-info-row">
-                  <span>Phone</span>
-                  <strong>{profile.phone || "—"}</strong>
+
+                <div className="profile-field">
+                  <span className="profile-label">Position</span>
+                  <span className="profile-value">{profile?.position || "Instructor"}</span>
+                </div>
+
+                <div className="profile-field">
+                  <span className="profile-label">Role</span>
+                  <span className="profile-value">{profile?.role || "Instructor"}</span>
                 </div>
               </div>
-            </div>
 
-            <div className="profile-card profile-actions-card">
-              <h2>Account Actions</h2>
               <div className="profile-actions">
-                <button className="primary-profile-btn" type="button" onClick={() => setShowEdit(true)}>
-                  Edit Account Info
+                <button
+                  className="primary-btn profile-main-action-btn"
+                  type="button"
+                  onClick={() => setShowEditProfile(true)}
+                >
+                  Edit Profile
                 </button>
-                <button className="secondary-profile-btn" type="button" onClick={() => setShowPassword(true)}>
+
+                <button
+                  className="primary-btn profile-main-action-btn"
+                  type="button"
+                  onClick={() => setShowChangePassword(true)}
+                >
                   Change Password
                 </button>
               </div>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
-      {showEdit && profile && (
-        <EditModal
+      {showEditProfile && profile && (
+        <EditProfileModal
           profile={profile}
-          onClose={() => setShowEdit(false)}
-          onSaved={(updated) => setProfile((prev) => ({ ...prev, ...updated, name: updated.name || `${updated.first_name || ""} ${updated.last_name || ""}`.trim() || prev.name }))}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={handleProfileSaved}
         />
       )}
 
-      {showPassword && (
-        <PasswordModal onClose={() => setShowPassword(false)} />
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
     </InstructorLayout>
   );
