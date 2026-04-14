@@ -41,7 +41,14 @@ def send_postmark_email(to_email, subject, html_body, text_body=""):
     server_token = getattr(settings, "POSTMARK_SERVER_TOKEN", "")
     from_email = getattr(settings, "POSTMARK_FROM_EMAIL", "")
 
+    print(f"[Postmark] send_postmark_email called")
+    print(f"[Postmark] token (first 8): {server_token[:8]!r}")
+    print(f"[Postmark] from_email: {from_email!r}")
+    print(f"[Postmark] to_email: {to_email!r}")
+    print(f"[Postmark] subject: {subject!r}")
+
     if not server_token or not from_email:
+        print("[Postmark] ABORT: token or from_email is empty — check .env")
         return False, "Postmark is not configured."
 
     headers = {
@@ -65,6 +72,9 @@ def send_postmark_email(to_email, subject, html_body, text_body=""):
         headers=headers,
         timeout=15,
     )
+
+    print(f"[Postmark] response status: {response.status_code}")
+    print(f"[Postmark] response body: {response.text}")
 
     if 200 <= response.status_code < 300:
         return True, "Email sent successfully."
@@ -141,4 +151,39 @@ def build_course_assignment_email_text(instructor_name, course_name, description
         f"Open Date: {open_date}\n"
         f"Status: {status}\n\n"
         f"Please log in to the portal to review the course details."
+    )
+
+
+def build_reset_password_email_html(name, reset_url):
+    display_name = name or "there"
+
+    return f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #222;">
+        <h2>Reset your NCBW Training Portal password</h2>
+        <p>Hello {display_name},</p>
+        <p>We received a request to reset your password. Click the button below to choose a new one.</p>
+        <p>
+          <a href="{reset_url}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">
+            Reset Password
+          </a>
+        </p>
+        <p>If the button does not work, paste this link into your browser:</p>
+        <p>{reset_url}</p>
+        <p>This link expires in 30 minutes and can only be used once.</p>
+        <p>If you did not request a password reset, you can safely ignore this email.</p>
+      </body>
+    </html>
+    """
+
+
+def build_reset_password_email_text(name, reset_url):
+    display_name = name or "there"
+
+    return (
+        f"Hello {display_name},\n\n"
+        f"We received a request to reset your NCBW Training Portal password.\n\n"
+        f"Reset your password here:\n{reset_url}\n\n"
+        f"This link expires in 30 minutes and can only be used once.\n\n"
+        f"If you did not request a password reset, you can safely ignore this email."
     )

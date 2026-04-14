@@ -9,8 +9,8 @@ urlpatterns = [
     path('profile/', views.update_profile, name='profile'),
     path('change-password/', views.change_password, name='change-password'),
     path('logout/', views.logout, name='logout'),
-    path('password-reset/', views.password_reset_request, name='password-reset'),
-    path('password-reset-confirm/', views.password_reset_confirm, name='password-reset-confirm'),
+    path('forgot-password/', views.password_reset_request, name='forgot-password'),
+    path('reset-password/', views.password_reset_confirm, name='reset-password'),
 
     # ADMIN USERS
     path('admin/instructors/invite/', views.AdminInviteInstructorView.as_view(), name='admin-invite-instructor'),

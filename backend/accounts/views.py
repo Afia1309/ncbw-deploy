@@ -1,13 +1,10 @@
 import re
 
 from django.contrib.auth.models import User
-from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.core.mail import send_mail
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -18,7 +15,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Course, LoginSecurity, Profile
+from .models import Course, LoginSecurity, PasswordResetToken, Profile
 from .serializers import (
     CourseCreateSerializer,
     CourseSerializer,
@@ -34,6 +31,8 @@ from .utils import (
     build_course_assignment_email_text,
     build_invite_email_html,
     build_invite_email_text,
+    build_reset_password_email_html,
+    build_reset_password_email_text,
     generate_user_id,
     send_postmark_email,
 )
@@ -217,52 +216,36 @@ def change_password(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def password_reset_request(request):
-    member_id = request.data.get("member_id", "").strip()
+    email = request.data.get("email", "").strip().lower()
 
     generic_message = {
-        "message": "If an account exists for that Member ID, a reset link has been sent to the email on file."
+        "message": "If an active account with that email exists, a password reset link has been sent."
     }
 
-    if not member_id:
+    if not email:
         return Response(generic_message, status=status.HTTP_200_OK)
 
     try:
-        user = User.objects.get(username=member_id)
+        user = User.objects.get(email__iexact=email, is_active=True)
     except User.DoesNotExist:
         return Response(generic_message, status=status.HTTP_200_OK)
 
-    if not user.email:
-        return Response(generic_message, status=status.HTTP_200_OK)
+    # Invalidate any previous unused tokens for this user
+    PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
 
-    token_generator = PasswordResetTokenGenerator()
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = token_generator.make_token(user)
+    reset_token = PasswordResetToken.objects.create(user=user)
 
-    from django.conf import settings
-    frontend_base_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:5173")
-    reset_url = f"{frontend_base_url.rstrip('/')}/reset-password?uid={uid}&token={token}"
+    reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={reset_token.token}"
 
-    subject = "Reset your NCBW Training Portal password"
-    html_body = f"""
-        <p>Hello {user.get_full_name() or user.username},</p>
-        <p>We received a request to reset your password.</p>
-        <p><a href="{reset_url}">Click here to reset your password</a></p>
-        <p>If you did not request this, you can ignore this email.</p>
-    """
-    text_body = (
-        f"Hello {user.get_full_name() or user.username},\n\n"
-        f"We received a request to reset your password.\n\n"
-        f"Use this link to reset it:\n{reset_url}\n\n"
-        f"If you did not request this, you can ignore this email."
-    )
+    name = user.get_full_name() or user.username
+    html_body = build_reset_password_email_html(name, reset_url)
+    text_body = build_reset_password_email_text(name, reset_url)
 
-    send_mail(
-        subject,
-        text_body,
-        None,
-        [user.email],
-        fail_silently=False,
-        html_message=html_body,
+    send_postmark_email(
+        to_email=user.email,
+        subject="Reset your NCBW Training Portal password",
+        html_body=html_body,
+        text_body=text_body,
     )
 
     return Response(generic_message, status=status.HTTP_200_OK)
@@ -271,38 +254,35 @@ def password_reset_request(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def password_reset_confirm(request):
-    uid = request.data.get("uid", "")
-    token = request.data.get("token", "")
+    token_value = request.data.get("token", "").strip()
     new_password = request.data.get("new_password", "")
     confirm_password = request.data.get("confirm_password", "")
 
-    if not uid or not token:
-        return Response(
-            {"detail": "Invalid reset link."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    invalid_response = Response(
+        {"detail": "Reset link is invalid or expired."},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+    if not token_value:
+        return invalid_response
 
     try:
-        user_id = force_str(urlsafe_base64_decode(uid))
-        user = User.objects.get(pk=user_id)
-    except Exception:
-        return Response(
-            {"detail": "Invalid reset link."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        reset_token = PasswordResetToken.objects.select_related("user").get(token=token_value)
+    except (PasswordResetToken.DoesNotExist, Exception):
+        return invalid_response
 
-    token_generator = PasswordResetTokenGenerator()
-    if not token_generator.check_token(user, token):
-        return Response(
-            {"detail": "Reset link is invalid or expired."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    if not reset_token.is_valid():
+        return invalid_response
 
     ok, payload = set_user_password_with_validation(
-        user,
+        reset_token.user,
         new_password,
         confirm_password,
     )
+
+    if ok:
+        reset_token.used = True
+        reset_token.save(update_fields=["used"])
 
     return Response(
         payload,
@@ -473,12 +453,7 @@ class AdminInviteInstructorView(APIView):
         profile.position = "General Member"
         profile.save()
 
-        frontend_base_url = getattr(request, "frontend_base_url", None)
-        if not frontend_base_url:
-            from django.conf import settings
-            frontend_base_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3000")
-
-        activation_url = f"{frontend_base_url.rstrip('/')}/signup?member_id={member_id}"
+        activation_url = f"{settings.FRONTEND_URL.rstrip('/')}/signup?member_id={member_id}"
 
         html_body = build_invite_email_html(name, member_id, "instructor", activation_url)
         text_body = build_invite_email_text(name, member_id, "instructor", activation_url)
@@ -537,9 +512,7 @@ class AdminInviteTraineeView(APIView):
         profile.invited_at = timezone.now()
         profile.save()
 
-        from django.conf import settings
-        frontend_base_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3000")
-        activation_url = f"{frontend_base_url.rstrip('/')}/signup?member_id={member_id}"
+        activation_url = f"{settings.FRONTEND_URL.rstrip('/')}/signup?member_id={member_id}"
 
         html_body = build_invite_email_html(name, member_id, "trainee", activation_url)
         text_body = build_invite_email_text(name, member_id, "trainee", activation_url)

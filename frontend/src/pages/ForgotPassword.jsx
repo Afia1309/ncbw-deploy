@@ -5,7 +5,7 @@ import "../Auth.css";
 import bgImage from "../assets/login-bg.jpg";
 
 export default function ForgotPassword() {
-  const [memberId, setMemberId] = useState("");
+  const [email, setEmail] = useState("");
   const [status, setStatus] = useState({ type: "", msg: "" });
   const [loading, setLoading] = useState(false);
 
@@ -15,13 +15,13 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      await api.post("auth/password-reset/", { member_id: memberId });
+      await api.post("auth/forgot-password/", { email });
 
       setStatus({
         type: "success",
-        msg: "If an account exists for that Member ID, a reset link has been sent to the email on file.",
+        msg: "If an active account with that email exists, a password reset link has been sent.",
       });
-      setMemberId("");
+      setEmail("");
     } catch (err) {
       console.error(err);
       setStatus({
@@ -45,17 +45,17 @@ export default function ForgotPassword() {
 
       <div className="auth-card">
         <h2>Reset Password</h2>
-        <p>Enter your Member ID and we’ll send a password reset link.</p>
+        <p>Enter your email and we will send you a password reset link.</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">
-            <label htmlFor="memberId">Member ID</label>
+            <label htmlFor="email">Email</label>
             <input
-              id="memberId"
+              id="email"
+              type="email"
               className="auth-input"
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              placeholder="e.g. 12345"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
