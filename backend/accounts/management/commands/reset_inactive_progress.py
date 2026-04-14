@@ -4,13 +4,13 @@ from django.core.management.base import BaseCommand # base class for creating cu
 from django.contrib.auth import get_user_model # retrieve active user model
 from django.utils import timezone # timezone utilites
 from datetime import timedelta # date/time utilites
-from django.db.models import Q, Max
+from django.db.models import Q, Max, F
 
 from django.core.mail import send_mail
 from django.conf import settings
 
 from notifications.models import Notification # Import class from models.py (in notifications folder in backend)
-from training.models import ModuleProgress # Import class from models.py (in training folder in backend)
+from training.models import ItemProgress
 
 User = get_user_model()
 
@@ -40,17 +40,14 @@ class Command(BaseCommand):
         cutoff_date = timezone.now() - timedelta(days=days) # Calculate cutoff date
 
         # Determine last module activity per user
-        user_activity = ModuleProgress.objects.exclude(
-            last_activity__isnull=True
-        ).values("user").annotate(
-            last_activity=Max("last_activity")
-        )
+        user_activity = ItemProgress.objects.values("user").annotate(last_activity=Max("last_activity"))
+        #user_activity = ItemProgress.objects.exclude(last_activity__isnull=True).values("user").annotate(last_activity=Max("last_activity"))
 
         # Find users whose last activity is older than cutoff
         inactive_user_ids = [
             entry["user"]
             for entry in user_activity
-            if entry["last_activity"] < cutoff_date
+            if entry["last_activity"] and entry["last_activity"] < cutoff_date
         ]
 
         # Query for inactive users
@@ -70,39 +67,56 @@ class Command(BaseCommand):
 
         # Loop through each inactive user
         for user in inactive_users:
-            #progress_qs = ModuleProgress.objects.filter(user=user).exclude(status="completed") # Only reset progress for incomplete modules
-            progress_qs = ModuleProgress.objects.filter(user=user, status="in_progress")
 
-            if not progress_qs.exists():
-                continue  # User has no training progress to reset/User has finished training
+            modules = (
+                ItemProgress.objects
+                .filter(user=user)
+                .values("item__module")
+                .distinct()
+            )
 
-            reset_modules = []  # Track which modules were reset
+            reset_modules = [] # Track which modules were reset
+            reset_happened = False
 
-            for progress in progress_qs:
-                total_resets += 1
+            for m in modules:
+                module_progress = ItemProgress.objects.filter(
+                    user=user,
+                    item__module=m["item__module"]
+                )
 
-                module_name = str(progress.module)
-                reset_modules.append(module_name)
+                if module_progress.filter(status="completed").count() == module_progress.count():
+                    #self.stdout.write(self.style.SUCCESS(f"Skipping {user} (course fully completed)"))
+                    continue # User has no training progress to reset/User has finished training
 
-                if dry_run:
-                    self.stdout.write(
-                        f"[DRY RUN] Would reset progress: {user} -> {progress.module}"
-                    )
-                else:
-                    progress.reset_progress()
+                reset_targets = module_progress.filter(status="in_progress")
 
-                    progress.last_activity = timezone.now()
-                    progress.save(update_fields=["last_activity"])
+                for progress in reset_targets:
+                    reset_happened = True
+                    total_resets += 1
 
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Reset progress: {user} -> {progress.module}"
+                    module_name = str(progress.item)
+                    reset_modules.append(module_name)
+
+                    if dry_run:
+                        self.stdout.write(
+                            f"[DRY RUN] Would reset progress: {user} -> {progress.item}"
                         )
-                    )
+                    else:
+                        progress.status = "not_started"
+                        progress.completed_at = None
+                        #progress.last_activity = None
+                        #progress.last_activity = timezone.now()
 
-            module_list = ", ".join(reset_modules)
+                        progress.save(update_fields=["status", "completed_at"])
 
-            if not dry_run:
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"Reset progress: {user} -> {progress.item}"
+                            )
+                        )
+
+            if not dry_run and reset_happened:
+                module_list = ", ".join(reset_modules)
                 # Create notification (once per user)
                 Notification.objects.create(
                     user=user,
