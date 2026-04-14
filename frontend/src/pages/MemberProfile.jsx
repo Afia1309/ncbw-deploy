@@ -3,11 +3,323 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/apiClient";
 import MemberLayout from "../../components/MemberLayout";
 import "./Dashboard.css";
+import "./ProfileShared.css";
+
+function splitName(fullName = "") {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" ") || "",
+  };
+}
+
+function mergeUpdatedProfile(previousProfile, payload) {
+  const updatedUser = payload?.user || payload || {};
+  const firstName = updatedUser.first_name ?? splitName(previousProfile?.name).firstName;
+  const lastName = updatedUser.last_name ?? splitName(previousProfile?.name).lastName;
+  const mergedName =
+    updatedUser.name ||
+    `${firstName} ${lastName}`.trim() ||
+    previousProfile?.name ||
+    "Member";
+
+  return {
+    ...previousProfile,
+    ...updatedUser,
+    name: mergedName,
+    email: updatedUser.email ?? previousProfile?.email ?? "",
+    phone: updatedUser.phone ?? previousProfile?.phone ?? "",
+  };
+}
+
+function EditProfileModal({ profile, onClose, onSaved }) {
+  const { firstName: initialFirstName, lastName: initialLastName } = splitName(profile?.name);
+
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [email, setEmail] = useState(profile?.email || "");
+  const [phone, setPhone] = useState(profile?.phone || "");
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const getErrorText = (value) => {
+    if (Array.isArray(value)) return value[0];
+    return value;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErrors({});
+
+    try {
+      const response = await api.patch("/auth/profile/", {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+      });
+
+      onSaved(response.data);
+      onClose();
+    } catch (err) {
+      setErrors(
+        err.response?.data && typeof err.response.data === "object"
+          ? err.response.data
+          : { detail: "Failed to save changes." }
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="profile-modal-overlay" onClick={onClose}>
+      <div
+        className="profile-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="profile-modal-header">
+          <h2>Edit Profile</h2>
+          <button
+            type="button"
+            className="profile-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="profile-modal-form">
+          <div className="profile-modal-row">
+            <div className="profile-modal-field">
+              <label>First Name</label>
+              <input
+                className="profile-modal-input"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
+              {errors.first_name && (
+                <span className="profile-modal-error">{getErrorText(errors.first_name)}</span>
+              )}
+            </div>
+
+            <div className="profile-modal-field">
+              <label>Last Name</label>
+              <input
+                className="profile-modal-input"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+              />
+              {errors.last_name && (
+                <span className="profile-modal-error">{getErrorText(errors.last_name)}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="profile-modal-field">
+            <label>Email</label>
+            <input
+              className="profile-modal-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            {errors.email && (
+              <span className="profile-modal-error">{getErrorText(errors.email)}</span>
+            )}
+          </div>
+
+          <div className="profile-modal-field">
+            <label>Phone</label>
+            <input
+              className="profile-modal-input"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            {errors.phone && (
+              <span className="profile-modal-error">{getErrorText(errors.phone)}</span>
+            )}
+          </div>
+
+          {errors.detail && <p className="profile-modal-error">{getErrorText(errors.detail)}</p>}
+
+          <div className="profile-modal-actions">
+            <button
+              type="button"
+              className="profile-modal-cancel"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="profile-modal-confirm"
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ChangePasswordModal({ onClose }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const getErrorText = (value) => {
+    if (Array.isArray(value)) return value[0];
+    return value;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErrors({});
+
+    try {
+      await api.post("/auth/change-password/", {
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+
+      setSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 1200);
+    } catch (err) {
+      setErrors(
+        err.response?.data && typeof err.response.data === "object"
+          ? err.response.data
+          : { detail: "Failed to change password." }
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="profile-modal-overlay" onClick={onClose}>
+      <div
+        className="profile-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="profile-modal-header">
+          <h2>Change Password</h2>
+          <button
+            type="button"
+            className="profile-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {success ? (
+          <p className="profile-modal-success">Password changed successfully.</p>
+        ) : (
+          <form onSubmit={handleSubmit} className="profile-modal-form">
+            <div className="profile-modal-field">
+              <label>Current Password</label>
+              <input
+                className="profile-modal-input"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+              {errors.current_password && (
+                <span className="profile-modal-error">
+                  {getErrorText(errors.current_password)}
+                </span>
+              )}
+            </div>
+
+            <div className="profile-modal-field">
+              <label>New Password</label>
+              <input
+                className="profile-modal-input"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              {errors.new_password && (
+                <span className="profile-modal-error">
+                  {getErrorText(errors.new_password)}
+                </span>
+              )}
+            </div>
+
+            <div className="profile-modal-field">
+              <label>Confirm New Password</label>
+              <input
+                className="profile-modal-input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              {errors.confirm_password && (
+                <span className="profile-modal-error">
+                  {getErrorText(errors.confirm_password)}
+                </span>
+              )}
+            </div>
+
+            {errors.detail && (
+              <p className="profile-modal-error">{getErrorText(errors.detail)}</p>
+            )}
+
+            <div className="profile-modal-actions">
+              <button
+                type="button"
+                className="profile-modal-cancel"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="profile-modal-confirm"
+                disabled={saving}
+              >
+                {saving ? "Changing..." : "Change Password"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function MemberProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -67,6 +379,10 @@ export default function MemberProfile() {
     }
   };
 
+  const handleProfileSaved = (payload) => {
+    setProfile((prev) => mergeUpdatedProfile(prev, payload));
+  };
+
   if (loading) {
     return (
       <MemberLayout title="Profile">
@@ -98,7 +414,7 @@ export default function MemberProfile() {
 
   return (
     <MemberLayout title="Member Profile">
-      <div className="profile-wrapper">
+      <div className="profile-wrapper profile-wrapper--wide">
         <div className="profile-card">
           <div className="profile-avatar-section">
             <div className="profile-avatar-circle">
@@ -164,15 +480,36 @@ export default function MemberProfile() {
 
             <div className="profile-actions">
               <button
-                className="primary-btn"
-                onClick={() => navigate("/member/manage-profile")}
+                className="primary-btn profile-main-action-btn"
+                type="button"
+                onClick={() => setShowEditProfile(true)}
               >
                 Edit Profile
+              </button>
+
+              <button
+                className="primary-btn profile-main-action-btn"
+                type="button"
+                onClick={() => setShowChangePassword(true)}
+              >
+                Change Password
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {showEditProfile && (
+        <EditProfileModal
+          profile={profile}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={handleProfileSaved}
+        />
+      )}
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </MemberLayout>
   );
 }
