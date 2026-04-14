@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db.models import Max
 
 from notifications.models import Notification
-from training.models import ModuleProgress
+from training.models import ItemProgress
 
 User = get_user_model() # get project's user model
 
@@ -44,7 +44,7 @@ class Command(BaseCommand):
             cutoff_date = timezone.now() - timedelta(days=days) # Calculate cutoff date
 
         # Determine last module activity per user
-        user_activity = ModuleProgress.objects.exclude(
+        user_activity = ItemProgress.objects.exclude(
             last_activity__isnull=True
         ).values("user").annotate(
             last_activity=Max("last_activity")
@@ -75,8 +75,8 @@ class Command(BaseCommand):
             if not user.email:
                 continue # Skip users without email addresses (unlikely to ever happen, but for safety)
 
-            #in_progress_modules = ModuleProgress.objects.filter(user=user).exclude(status="completed") # Only send emails for incomplete modules
-            in_progress_modules = ModuleProgress.objects.filter(user=user, status="in_progress")
+            #in_progress_modules = ItemProgress.objects.filter(user=user).exclude(status="completed") # Only send emails for incomplete modules
+            in_progress_modules = ItemProgress.objects.filter(user=user, status="in_progress")
 
             # Send reminder email
             send_mail(
