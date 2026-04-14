@@ -1085,7 +1085,7 @@ export default function InstructorCourseDetail() {
 
           {activeTab === "Content" && (
             <button className="gold-action-btn" onClick={() => setShowAddModuleModal(true)}>
-              + Add Content
+              + Add Module
             </button>
           )}
         </div>
