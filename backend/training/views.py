@@ -623,6 +623,43 @@ class InstructorNotifyView(APIView):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def submit_course_feedback(request, course_id):
+    try:
+        course = Course.objects.select_related("instructor").get(id=course_id)
+    except Course.DoesNotExist:
+        return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not course.instructor:
+        return Response({"detail": "This course has no instructor."}, status=status.HTTP_400_BAD_REQUEST)
+
+    rating = request.data.get("rating")
+    message = str(request.data.get("message", "")).strip()
+
+    if not rating or not message:
+        return Response({"detail": "Rating and message are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        rating = int(rating)
+        if not (1 <= rating <= 5):
+            raise ValueError
+    except (ValueError, TypeError):
+        return Response({"detail": "Rating must be a number between 1 and 5."}, status=status.HTTP_400_BAD_REQUEST)
+
+    member_name = request.user.get_full_name() or get_member_id(request.user)
+
+    Notification.objects.create(
+        user=course.instructor,
+        course=course,
+        notification_type="feedback",
+        title=f"Feedback on \"{course.name}\"",
+        message=f"From {member_name} — Rating: {rating}/5\n\n{message}",
+    )
+
+    return Response({"ok": True})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def update_item_progress(request, item_id):
     try:
         item = Item.objects.select_related("module__course").get(id=item_id)
@@ -655,53 +692,83 @@ def update_item_progress(request, item_id):
         "completed_at": progress.completed_at,
     })
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_certificate(request):
-    user = request.user
-    
+def _get_track_name(user):
+    """Derive the training track name from the user's position."""
+    if hasattr(user, "profile") and user.profile.position:
+        return f"{user.profile.position} Training"
+    return "Leadership Training"
+
+
+def _check_track_completion(user):
+    """
+    Returns (accessible_courses, all_complete).
+    accessible_courses = list of (course, visible_items) for all courses
+    assigned to the user that have at least one visible item.
+    all_complete = True only when every accessible course is fully completed.
+    """
     courses = Course.objects.filter(status="Published").prefetch_related(
         "position_targets",
         "member_targets",
-        "modules__items"
+        "modules__items",
     )
-    
-    eligible_courses = []
+
+    accessible = []
     for course in courses:
         if not (course_matches_user(course, user) or is_admin(user)):
             continue
-        
         visible_items = visible_items_for_user(course, user)
         if not visible_items:
             continue
-        
+        accessible.append((course, visible_items))
+
+    if not accessible:
+        return accessible, False
+
+    all_complete = True
+    for course, visible_items in accessible:
         item_ids = [item.id for item in visible_items]
         completed_count = ItemProgress.objects.filter(
             user=user,
             item_id__in=item_ids,
-            status='completed'
+            status="completed",
         ).count()
-        
-        if completed_count == len(visible_items) and len(visible_items) > 0:
-            eligible_courses.append(course)
-    
-    if not eligible_courses:
+        if completed_count < len(visible_items):
+            all_complete = False
+            break
+
+    return accessible, all_complete
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_certificate(request):
+    user = request.user
+
+    accessible, all_complete = _check_track_completion(user)
+
+    if not accessible:
         return Response(
-            {"detail": "Complete all items in a course first to earn a certificate."},
-            status=status.HTTP_400_BAD_REQUEST
+            {"detail": "No courses are assigned to your training track."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
-    
-    first_course = eligible_courses[0]
+
+    if not all_complete:
+        return Response(
+            {"detail": "Complete all courses in your training track to earn a certificate."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    track_name = _get_track_name(user)
     certificate_data = {
         "certificate": {
             "user": user.get_full_name() or user.username,
             "member_id": get_member_id(user),
-            "track": "Leadership Training Program",
+            "track": track_name,
             "issued_date": timezone.now().strftime("%B %d, %Y"),
-            "certificate_code": f"NCBW-{user.id}-{first_course.id}-{timezone.now().year}"
+            "certificate_code": f"NCBW-{user.id}-{timezone.now().year}",
         }
     }
-    
+
     return Response(certificate_data)
 
 
@@ -709,53 +776,35 @@ def get_certificate(request):
 @permission_classes([IsAuthenticated])
 def download_certificate_pdf(request):
     user = request.user
-    
-    courses = Course.objects.filter(status="Published").prefetch_related(
-        "position_targets",
-        "member_targets",
-        "modules__items"
-    )
-    
-    eligible_course = None
-    for course in courses:
-        if not (course_matches_user(course, user) or is_admin(user)):
-            continue
-        
-        visible_items = visible_items_for_user(course, user)
-        if not visible_items:
-            continue
-        
-        item_ids = [item.id for item in visible_items]
-        completed_count = ItemProgress.objects.filter(
-            user=user,
-            item_id__in=item_ids,
-            status='completed'
-        ).count()
-        
-        if completed_count == len(visible_items) and len(visible_items) > 0:
-            eligible_course = course
-            break
-    
-    if not eligible_course:
+
+    accessible, all_complete = _check_track_completion(user)
+
+    if not accessible:
         return Response(
-            {"detail": "Complete all items in a course first to download certificate."},
-            status=status.HTTP_400_BAD_REQUEST
+            {"detail": "No courses are assigned to your training track."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
-    
+
+    if not all_complete:
+        return Response(
+            {"detail": "Complete all courses in your training track to download your certificate."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    track_name = _get_track_name(user)
     user_name = user.get_full_name() or user.username
     member_id = get_member_id(user)
-    course_name = eligible_course.name
     completion_date = timezone.now().strftime("%B %d, %Y")
-    certificate_code = f"NCBW-{user.id}-{eligible_course.id}-{timezone.now().year}"
-    
+    certificate_code = f"NCBW-{user.id}-{timezone.now().year}"
+
     pdf_buffer = generate_certificate_pdf(
         user_name=user_name,
         member_id=member_id,
-        course_name=course_name,
+        track_name=track_name,
         completion_date=completion_date,
-        certificate_code=certificate_code
+        certificate_code=certificate_code,
     )
-    
-    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="certificate_{user.id}_{eligible_course.id}.pdf"'
+
+    response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="certificate_{user.id}.pdf"'
     return response

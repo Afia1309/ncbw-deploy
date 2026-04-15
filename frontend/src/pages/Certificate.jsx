@@ -74,7 +74,7 @@ export default function Certificate() {
         <p className="dash-eyebrow">Certificate of Completion</p>
         <h1 className="dash-block-title">{certificate.user}</h1>
         <p className="dash-subtext">
-          has successfully completed the
+          for successfully completing the
         </p>
         <h2 style={{ marginTop: "12px" }}>{certificate.track}</h2>
 

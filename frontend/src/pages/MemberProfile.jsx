@@ -463,16 +463,6 @@ export default function MemberProfile() {
               </div>
 
               <div className="profile-field">
-                <span className="profile-label">Track</span>
-                <span className="profile-value">{profile.track || "Leadership Track"}</span>
-              </div>
-
-              <div className="profile-field">
-                <span className="profile-label">Phase</span>
-                <span className="profile-value">{profile.phase || "Phase 1"}</span>
-              </div>
-
-              <div className="profile-field">
                 <span className="profile-label">Cohort</span>
                 <span className="profile-value">{profile.cohort || "2026"}</span>
               </div>

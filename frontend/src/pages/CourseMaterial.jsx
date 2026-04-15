@@ -617,14 +617,18 @@ export default function CourseMaterial() {
                 )}
                 <div style={{ fontSize: "0.78rem", color: "#98a2b3", marginTop: "2px" }}>
                   {item.status === "completed" ? "✓ Completed" : item.status === "in_progress" ? "In progress" : "Not started"}
-                  {" · "}
-                  <button
-                    type="button"
-                    onClick={() => toggleItemStatus(item.id)}
-                    style={{ border: "none", background: "none", padding: 0, color: "#6366f1", cursor: "pointer", fontSize: "0.78rem", fontWeight: 500 }}
-                  >
-                    {item.status === "completed" ? "Unmark" : "Mark complete"}
-                  </button>
+                  {itemType !== "quiz" && (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        onClick={() => toggleItemStatus(item.id)}
+                        style={{ border: "none", background: "none", padding: 0, color: "#6366f1", cursor: "pointer", fontSize: "0.78rem", fontWeight: 500 }}
+                      >
+                        {item.status === "completed" ? "Unmark" : "Mark complete"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
