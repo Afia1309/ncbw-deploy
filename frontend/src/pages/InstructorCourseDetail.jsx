@@ -92,14 +92,15 @@ async function fetchWithAuth(url, options = {}) {
   });
 
   if (!response.ok) {
-    let errorMessage = "Request failed.";
+    let errorData = null;
     try {
-      const errorData = await response.json();
-      errorMessage = JSON.stringify(errorData);
+      errorData = await response.json();
     } catch {
-      errorMessage = response.statusText || errorMessage;
+      // non-JSON error body
     }
-    throw new Error(errorMessage);
+    const err = new Error(response.statusText || "Request failed.");
+    err.fieldErrors = errorData || {};
+    throw err;
   }
 
   if (response.status === 204) return null;
@@ -134,8 +135,16 @@ export default function InstructorCourseDetail() {
   const [showAddModuleModal, setShowAddModuleModal] = useState(false);
   const [newModuleTitle, setNewModuleTitle] = useState("");
   const [newModuleVisible, setNewModuleVisible] = useState(true);
+  const [moduleFormError, setModuleFormError] = useState("");
 
   const [showItemModal, setShowItemModal] = useState(false);
+  const [itemErrors, setItemErrors] = useState({});
+
+  const setItemFieldError = (field, msg) =>
+    setItemErrors((prev) => ({ ...prev, [field]: msg }));
+  const clearItemFieldError = (field) =>
+    setItemErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
+  const clearAllItemErrors = () => setItemErrors({});
   const [itemModalMode, setItemModalMode] = useState("create");
   const [selectedModuleId, setSelectedModuleId] = useState(null);
   const [editingItemId, setEditingItemId] = useState(null);
@@ -700,7 +709,11 @@ export default function InstructorCourseDetail() {
 
   const handleCreateModule = async () => {
     const trimmed = newModuleTitle.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setModuleFormError("Module title is required.");
+      return;
+    }
+    setModuleFormError("");
 
     try {
       setActionLoading(true);
@@ -729,23 +742,53 @@ export default function InstructorCourseDetail() {
   };
 
   const handleSubmitItem = async () => {
-    if (!newItemTitle.trim()) return;
-    if (!selectedModuleId) return;
+    const backendType = labelToBackendType[newItemType];
+    const isFileItem = backendType === "pdf" || backendType === "video";
+    const isEditing = itemModalMode === "edit" && editingItemId;
+
+    // Per-field validation — each error goes to the field it belongs to
+    const errors = {};
+
+    if (!newItemTitle.trim()) {
+      errors.title = "Item title is required.";
+    }
+    if (isFileItem && itemModalMode === "create" && !newItemFile) {
+      errors.file = `A ${newItemType} file is required.`;
+    }
+    if ((backendType === "external_video" || backendType === "link") && !newItemExternalUrl.trim()) {
+      errors.url = "A URL is required.";
+    }
+    if (backendType === "text" && !newItemTextContent.trim()) {
+      errors.content = "Text content is required.";
+    }
+    if (backendType === "quiz") {
+      const hasValidQuestion = quizQuestions.some(
+        (q) =>
+          q.prompt.trim() &&
+          q.options.filter((o) => o.text.trim()).length >= 2 &&
+          q.correctOptionId &&
+          Number(q.points) > 0
+      );
+      if (!hasValidQuestion) {
+        errors.quiz = "Add at least one question with a prompt, 2+ options, a correct answer, and a point value.";
+      }
+    }
+    if (newItemAudienceType === "role" && !newItemAudienceRoles.length) {
+      errors.audience = "Select at least one leadership role.";
+    }
+    if (newItemAudienceType === "member" && !newItemAudienceMemberIds.length) {
+      errors.audience = "Add at least one member ID.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setItemErrors(errors);
+      return;
+    }
+
+    clearAllItemErrors();
 
     try {
       setActionLoading(true);
-
-      const backendType = labelToBackendType[newItemType];
-      const isFileItem = backendType === "pdf" || backendType === "video";
-      const isEditing = itemModalMode === "edit" && editingItemId;
-
-      if (newItemAudienceType === "role" && !newItemAudienceRoles.length) {
-        throw new Error("Select at least one leadership role.");
-      }
-
-      if (newItemAudienceType === "member" && !newItemAudienceMemberIds.length) {
-        throw new Error("Add at least one member ID.");
-      }
 
       let url = `${API_BASE}/instructor/modules/${selectedModuleId}/items/`;
       let method = "POST";
@@ -782,7 +825,22 @@ export default function InstructorCourseDetail() {
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || "Failed to save item.");
+      // Map backend field errors to the correct fields
+      const fe = error.fieldErrors || {};
+      const mapped = {};
+      if (fe.title) mapped.title = fe.title[0] || fe.title;
+      if (fe.file) mapped.file = fe.file[0] || fe.file;
+      if (fe.external_url) mapped.url = fe.external_url[0] || fe.external_url;
+      if (fe.text_content) mapped.content = fe.text_content[0] || fe.text_content;
+      if (fe.quiz_data) mapped.quiz = fe.quiz_data[0] || fe.quiz_data;
+      if (fe.audience_type || fe.audience_roles || fe.audience_member_ids) {
+        mapped.audience = (fe.audience_type || fe.audience_roles || fe.audience_member_ids || ["Audience error"])[0];
+      }
+      if (Object.keys(mapped).length > 0) {
+        setItemErrors(mapped);
+      } else {
+        setItemErrors({ general: "Failed to save item. Please try again." });
+      }
     } finally {
       setActionLoading(false);
     }
@@ -851,13 +909,18 @@ export default function InstructorCourseDetail() {
           <input
             type="file"
             accept=".pdf,application/pdf"
-            onChange={(e) => setNewItemFile(e.target.files?.[0] || null)}
+            onChange={(e) => { setNewItemFile(e.target.files?.[0] || null); clearItemFieldError("file"); }}
             className="file-input"
           />
           {existingFileName && itemModalMode === "edit" && !newItemFile && (
             <p className="field-helper">Current file: {existingFileName}</p>
           )}
           {newItemFile && <p className="field-helper">Selected file: {newItemFile.name}</p>}
+          {itemErrors.file && (
+            <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+              {itemErrors.file}
+            </p>
+          )}
         </div>
       );
     }
@@ -869,13 +932,18 @@ export default function InstructorCourseDetail() {
           <input
             type="file"
             accept="video/*"
-            onChange={(e) => setNewItemFile(e.target.files?.[0] || null)}
+            onChange={(e) => { setNewItemFile(e.target.files?.[0] || null); clearItemFieldError("file"); }}
             className="file-input"
           />
           {existingFileName && itemModalMode === "edit" && !newItemFile && (
             <p className="field-helper">Current file: {existingFileName}</p>
           )}
           {newItemFile && <p className="field-helper">Selected file: {newItemFile.name}</p>}
+          {itemErrors.file && (
+            <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+              {itemErrors.file}
+            </p>
+          )}
         </div>
       );
     }
@@ -887,11 +955,16 @@ export default function InstructorCourseDetail() {
           <input
             type="url"
             value={newItemExternalUrl}
-            onChange={(e) => setNewItemExternalUrl(e.target.value)}
+            onChange={(e) => { setNewItemExternalUrl(e.target.value); clearItemFieldError("url"); }}
             placeholder={
               newItemType === "External Video" ? "Paste external video link" : "Paste link"
             }
           />
+          {itemErrors.url && (
+            <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+              {itemErrors.url}
+            </p>
+          )}
         </div>
       );
     }
@@ -902,10 +975,15 @@ export default function InstructorCourseDetail() {
           <label>Text Content</label>
           <textarea
             value={newItemTextContent}
-            onChange={(e) => setNewItemTextContent(e.target.value)}
+            onChange={(e) => { setNewItemTextContent(e.target.value); clearItemFieldError("content"); }}
             placeholder="Enter the text students should read"
             rows={6}
           />
+          {itemErrors.content && (
+            <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+              {itemErrors.content}
+            </p>
+          )}
         </div>
       );
     }
@@ -1032,6 +1110,12 @@ export default function InstructorCourseDetail() {
           <div className="quiz-autograde-note">
             Auto-grading enabled. Correct answers remain instructor-only.
           </div>
+
+          {itemErrors.quiz && (
+            <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "8px", marginBottom: 0 }}>
+              {itemErrors.quiz}
+            </p>
+          )}
         </div>
       );
     }
@@ -1522,9 +1606,14 @@ export default function InstructorCourseDetail() {
                 <input
                   type="text"
                   value={newModuleTitle}
-                  onChange={(e) => setNewModuleTitle(e.target.value)}
+                  onChange={(e) => { setNewModuleTitle(e.target.value); setModuleFormError(""); }}
                   placeholder="Enter module title"
                 />
+                {moduleFormError && (
+                  <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+                    {moduleFormError}
+                  </p>
+                )}
               </div>
 
               <div className="modal-checkbox-row">
@@ -1554,14 +1643,25 @@ export default function InstructorCourseDetail() {
             <div className="modal-card large-modal-card" onClick={(e) => e.stopPropagation()}>
               <h2>{itemModalMode === "edit" ? "Edit Item" : "Add Item"}</h2>
 
+              {itemErrors.general && (
+                <p style={{ color: "#dc2626", fontSize: "0.82rem", marginBottom: "8px" }}>
+                  {itemErrors.general}
+                </p>
+              )}
+
               <div className="modal-field">
                 <label>Item Title</label>
                 <input
                   type="text"
                   value={newItemTitle}
-                  onChange={(e) => setNewItemTitle(e.target.value)}
+                  onChange={(e) => { setNewItemTitle(e.target.value); clearItemFieldError("title"); }}
                   placeholder="Enter item title"
                 />
+                {itemErrors.title && (
+                  <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+                    {itemErrors.title}
+                  </p>
+                )}
               </div>
 
               <div className="modal-field">
@@ -1614,7 +1714,7 @@ export default function InstructorCourseDetail() {
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={() => toggleNewItemRole(role)}
+                            onChange={() => { toggleNewItemRole(role); clearItemFieldError("audience"); }}
                           />
                           <span className="custom-checkbox" />
                           <span className="position-label">{role}</span>
@@ -1622,6 +1722,11 @@ export default function InstructorCourseDetail() {
                       );
                     })}
                   </div>
+                  {itemErrors.audience && (
+                    <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+                      {itemErrors.audience}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1656,6 +1761,11 @@ export default function InstructorCourseDetail() {
                       </span>
                     ))}
                   </div>
+                  {itemErrors.audience && (
+                    <p style={{ color: "#dc2626", fontSize: "0.82rem", marginTop: "4px", marginBottom: 0 }}>
+                      {itemErrors.audience}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1674,6 +1784,7 @@ export default function InstructorCourseDetail() {
                   className="outline-btn"
                   onClick={() => {
                     setShowItemModal(false);
+                    clearAllItemErrors();
                     resetItemForm();
                   }}
                 >

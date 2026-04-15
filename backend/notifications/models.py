@@ -15,6 +15,8 @@ class Notification(models.Model):
         ("announcement", "Announcement"),
         ("reminder", "Reminder"),
         ("general", "General Message"),
+        # Member-to-instructor types
+        ("feedback", "Course Feedback"),
     ]
 
     user = models.ForeignKey(

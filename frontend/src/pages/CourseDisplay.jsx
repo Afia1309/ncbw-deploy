@@ -329,9 +329,28 @@ export default function CourseDisplay() {
     setFeedbackRating(0);
   };
 
-  const handleFeedbackSubmit = (event) => {
+  const handleFeedbackSubmit = async (event) => {
     event.preventDefault();
     if (!feedbackMessage.trim() || !feedbackRating) return;
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE}/api/training/courses/${id}/feedback/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating: feedbackRating, message: feedbackMessage.trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit feedback");
+      }
+    } catch {
+      // Submit silently — don't block the success state on a network hiccup
+    }
+
     setFeedbackSubmitted(true);
     window.setTimeout(() => {
       closeFeedbackModal();
