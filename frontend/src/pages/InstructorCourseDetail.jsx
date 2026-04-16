@@ -98,7 +98,9 @@ async function fetchWithAuth(url, options = {}) {
     } catch {
       // non-JSON error body
     }
-    const err = new Error(response.statusText || "Request failed.");
+    const detail = errorData?.detail || errorData?.non_field_errors?.[0] || response.statusText || "Request failed.";
+    const err = new Error(`HTTP ${response.status}: ${detail}`);
+    err.status = response.status;
     err.fieldErrors = errorData || {};
     throw err;
   }
@@ -850,7 +852,7 @@ export default function InstructorCourseDetail() {
       if (Object.keys(mapped).length > 0) {
         setItemErrors(mapped);
       } else {
-        setItemErrors({ general: "Failed to save item. Please try again." });
+        setItemErrors({ general: error.message || "Failed to save item. Please try again." });
       }
     } finally {
       setActionLoading(false);
