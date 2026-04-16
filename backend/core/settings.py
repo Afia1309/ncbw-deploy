@@ -30,9 +30,8 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv(
-    "127.0.0.1",
-    "localhost"
-    ".onrender.com"
+    "ALLOWED_HOSTS",
+    "127.0.0.1,localhost,.onrender.com"
 ).split(",")
 
 
