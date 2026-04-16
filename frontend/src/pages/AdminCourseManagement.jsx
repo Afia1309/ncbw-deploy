@@ -3,7 +3,7 @@ import AdminLayout from "../components/AdminLayout";
 import "./AdminCourseManagement.css";
 
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
+  (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000") + "/api/auth";
 
 export default function AdminCourseManagement() {
   const [courses, setCourses] = useState([]);
