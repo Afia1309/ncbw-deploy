@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../api/apiClient";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import "../Auth.css";
@@ -8,7 +8,6 @@ const POSITIONS = [
   "President",
   "Vice President",
   "Treasurer",
-  "Secretary",
   "Chaplain",
   "Parliamentarian",
   "General Member",
@@ -20,7 +19,8 @@ export default function Signup() {
   const params = new URLSearchParams(location.search);
   const memberId = params.get("member_id");
 
-  const [role, setRole] = useState("trainee");
+  const [inviteRole, setInviteRole] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(true);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,21 +30,33 @@ export default function Signup() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [agree, setAgree] = useState(false);
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!memberId) {
+      setInviteLoading(false);
+      return;
+    }
+    api
+      .get(`/auth/invite-info/?member_id=${memberId}`)
+      .then((res) => {
+        setInviteRole(res.data.role);
+        setEmail(res.data.email);
+      })
+      .catch(() => {
+        setInviteRole(null);
+      })
+      .finally(() => setInviteLoading(false));
+  }, [memberId]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setFieldErrors({});
 
-    if (!agree) {
-      setError("You must agree to the terms of service.");
-      return;
-    }
     if (password !== passwordConfirm) {
       setFieldErrors((prev) => ({
         ...prev,
@@ -58,12 +70,12 @@ export default function Signup() {
     try {
       await api.post("/auth/register/", {
         member_id: memberId,
-        role,
+        role: inviteRole,
         first_name: firstName,
         last_name: lastName,
         email,
         phone_number: phoneNumber,
-        position: role === "instructor" ? "General Member" : position,
+        position: inviteRole === "instructor" ? "General Member" : position,
         password,
         password_confirm: passwordConfirm,
       });
@@ -116,6 +128,46 @@ export default function Signup() {
     );
   }
 
+  if (inviteLoading) {
+    return (
+      <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
+        <div className="auth-left">
+          <h1 className="auth-title">
+            Welcome to the NCBW-QCMC
+            <br />
+            Training Portal
+          </h1>
+        </div>
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <p style={{ color: "#6b7280" }}>Verifying invitation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!inviteRole) {
+    return (
+      <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
+        <div className="auth-left">
+          <h1 className="auth-title">
+            Welcome to the NCBW-QCMC
+            <br />
+            Training Portal
+          </h1>
+        </div>
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <h1 style={{ marginBottom: "12px" }}>Invalid Invitation</h1>
+          <p style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: "24px" }}>
+            This invitation link is invalid or has already been used. Please check your email or contact NCBW.
+          </p>
+          <button className="auth-button" onClick={() => navigate("/login")}>
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="auth-page"
@@ -131,23 +183,18 @@ export default function Signup() {
 
       <div className="auth-card signup-card">
         <h1>Sign Up</h1>
-        <p style={{ fontSize: "0.85rem", color: "#f20606", margin: "-8px 0 16px" }}>
-          Your account ID will be generated automatically based on your role.
-        </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          {/* Role display — read-only, driven by invite */}
           <div className="auth-field">
-            <label htmlFor="role">Account Role</label>
-            <select
-              id="role"
-              className="auth-select"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              required
-            >
-              <option value="trainee">Member / Trainee</option>
-              <option value="instructor">Instructor</option>
-            </select>
+            <label>Account Role</label>
+            <input
+              className="auth-input"
+              type="text"
+              value={inviteRole === "instructor" ? "Instructor" : "Member / Trainee"}
+              readOnly
+              style={{ background: "#f3f4f6", color: "#6b7280", cursor: "default" }}
+            />
           </div>
 
           <div className="auth-field">
@@ -187,8 +234,8 @@ export default function Signup() {
               className="auth-input"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+              readOnly
+              style={{ background: "#f3f4f6", color: "#6b7280", cursor: "default" }}
             />
             {fieldErrors.email && (
               <div className="field-error">{fieldErrors.email}</div>
@@ -209,7 +256,7 @@ export default function Signup() {
             )}
           </div>
 
-          {role === "trainee" && (
+          {inviteRole === "trainee" && (
             <div className="auth-field">
               <label htmlFor="position">Position You Are Going For</label>
               <select
@@ -284,16 +331,6 @@ export default function Signup() {
                 {fieldErrors.password_confirm}
               </div>
             )}
-          </div>
-
-          <div className="auth-checkbox-row">
-            <input
-              id="tos"
-              type="checkbox"
-              checked={agree}
-              onChange={(e) => setAgree(e.target.checked)}
-            />
-            <label htmlFor="tos">I agree to the terms of service</label>
           </div>
 
           <button

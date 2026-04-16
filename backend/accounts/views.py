@@ -290,13 +290,33 @@ def password_reset_confirm(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def invite_info(request):
+    """
+    Returns the role of a pending invited user so the signup page
+    can render the correct UI without trusting the frontend for role.
+    """
+    member_id = request.query_params.get("member_id", "").strip()
+    if not member_id:
+        return Response({"detail": "member_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(username=member_id, profile__status="pending").first()
+    if not user:
+        return Response({"detail": "Invalid or already-used invitation link."}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        "role": user.profile.role,
+        "email": user.email,
+    })
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register(request):
     """
-    Supports two cases:
-    1. Activation of an invited pending account
-    2. Direct creation if no invited account exists yet
+    Activation of an invited pending account.
+    Role is determined by the invite; submitted role must match.
     """
     try:
         member_id = request.data.get("member_id", "").strip()
@@ -305,9 +325,7 @@ def register(request):
         email = request.data.get("email", "").strip().lower()
         phone_number = request.data.get("phone_number", "")
         position = request.data.get("position", "General Member")
-        role = request.data.get("role", "trainee").strip().lower()
-        if role not in ("trainee", "instructor"):
-            role = "trainee"
+        submitted_role = request.data.get("role", "").strip().lower()
         password = request.data.get("password", "")
         password_confirm = request.data.get("password_confirm", "")
 
@@ -338,6 +356,9 @@ def register(request):
         if invited_user and invited_user.profile.status == "pending":
             if invited_user.email.lower() != email:
                 errors["email"] = ["This email does not match the invited account."]
+            # Enforce that the submitted role matches what the invite was created for
+            if submitted_role and submitted_role != invited_user.profile.role:
+                errors["role"] = ["Submitted role does not match the invitation type."]
 
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
