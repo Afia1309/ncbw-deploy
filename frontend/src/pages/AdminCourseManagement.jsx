@@ -10,6 +10,9 @@ export default function AdminCourseManagement() {
   const [instructors, setInstructors] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null); // null = create, object = edit
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
@@ -83,6 +86,7 @@ export default function AdminCourseManagement() {
   }, [courses, searchTerm]);
 
   function handleOpenModal() {
+    setEditingCourse(null);
     setFormData({
       name: "",
       description: "",
@@ -93,8 +97,31 @@ export default function AdminCourseManagement() {
     setShowModal(true);
   }
 
+  function handleOpenEditModal(course) {
+    setEditingCourse(course);
+    setFormData({
+      name: course.name || "",
+      description: course.description || "",
+      instructor: course.instructor ? String(course.instructor) : "",
+      openDate: course.open_date || "",
+      status: course.status || "Draft",
+    });
+    setShowModal(true);
+  }
+
   function handleCloseModal() {
     setShowModal(false);
+    setEditingCourse(null);
+  }
+
+  function handleOpenDeleteModal(course) {
+    setCourseToDelete(course);
+    setShowDeleteModal(true);
+  }
+
+  function handleCloseDeleteModal() {
+    setShowDeleteModal(false);
+    setCourseToDelete(null);
   }
 
   function handleChange(e) {
@@ -118,38 +145,49 @@ export default function AdminCourseManagement() {
       return;
     }
 
+    const payload = {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      instructor: Number(formData.instructor),
+      open_date: formData.openDate,
+      status: formData.status,
+    };
+
     try {
-      const response = await fetch(`${API_BASE}/admin/courses/`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          instructor: Number(formData.instructor),
-          open_date: formData.openDate,
-          status: formData.status,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.detail || "Failed to create course.");
+      if (editingCourse) {
+        const response = await fetch(`${API_BASE}/admin/courses/${editingCourse.id}/`, {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.detail || "Failed to update course.");
+        setCourses((prev) =>
+          prev.map((c) => (c.id === editingCourse.id ? data.course : c))
+        );
+      } else {
+        const response = await fetch(`${API_BASE}/admin/courses/`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.detail || "Failed to create course.");
+        setCourses((prev) => [data.course, ...prev]);
       }
 
-      setCourses((prev) => [data.course, ...prev]);
       setShowModal(false);
+      setEditingCourse(null);
     } catch (error) {
       console.error(error);
       alert(error.message);
     }
   }
 
-  async function handleDeleteCourse(courseId) {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this course?"
-    );
-    if (!confirmed) return;
+  async function handleConfirmDelete() {
+    if (!courseToDelete) return;
+    const courseId = courseToDelete.id;
+    handleCloseDeleteModal();
 
     try {
       const response = await fetch(`${API_BASE}/admin/courses/${courseId}/`, {
@@ -159,16 +197,13 @@ export default function AdminCourseManagement() {
 
       let data = {};
       const contentType = response.headers.get("content-type");
-
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       }
 
-      if (!response.ok) {
-        throw new Error(data?.detail || "Failed to delete course.");
-      }
+      if (!response.ok) throw new Error(data?.detail || "Failed to delete course.");
 
-      setCourses((prev) => prev.filter((course) => course.id !== courseId));
+      setCourses((prev) => prev.filter((c) => c.id !== courseId));
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -254,12 +289,20 @@ export default function AdminCourseManagement() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          className="table-action-btn delete"
-                          onClick={() => handleDeleteCourse(course.id)}
-                        >
-                          Delete
-                        </button>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            className="table-action-btn"
+                            onClick={() => handleOpenEditModal(course)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="table-action-btn delete"
+                            onClick={() => handleOpenDeleteModal(course)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -275,12 +318,43 @@ export default function AdminCourseManagement() {
           </div>
         </div>
 
+        {showDeleteModal && courseToDelete && (
+          <div className="modal-overlay">
+            <div className="modal-card" style={{ maxWidth: "460px" }}>
+              <h2>Delete Course</h2>
+              <p className="modal-subtext">
+                Are you sure you want to delete <strong>{courseToDelete.name}</strong>?
+                This action is permanent and cannot be undone.
+              </p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="modal-btn secondary"
+                  onClick={handleCloseDeleteModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="modal-btn"
+                  style={{ background: "#dc2626", color: "#fff" }}
+                  onClick={handleConfirmDelete}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showModal && (
           <div className="modal-overlay">
             <div className="modal-card">
-              <h2>Add Course</h2>
+              <h2>{editingCourse ? "Edit Course" : "Add Course"}</h2>
               <p className="modal-subtext">
-                Enter the course details and assign an instructor.
+                {editingCourse
+                  ? "Update the course details below."
+                  : "Enter the course details and assign an instructor."}
               </p>
 
               <form onSubmit={handleSaveCourse} className="course-form">
@@ -354,7 +428,7 @@ export default function AdminCourseManagement() {
                     Cancel
                   </button>
                   <button type="submit" className="modal-btn primary">
-                    Save Course
+                    {editingCourse ? "Update Course" : "Save Course"}
                   </button>
                 </div>
               </form>

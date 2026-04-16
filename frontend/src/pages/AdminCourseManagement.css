@@ -249,6 +249,24 @@
   border: 1px solid #d1d5db;
 }
 
+.table-action-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(201, 162, 39, 0.14);
+  color: #9a7b12;
+  border: 1px solid rgba(201, 162, 39, 0.24);
+}
+
+.table-action-btn.delete {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+}
+
 @media (max-width: 768px) {
   .admin-course-page {
     padding: 24px 20px 28px;
