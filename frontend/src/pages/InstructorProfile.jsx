@@ -181,6 +181,9 @@ function ChangePasswordModal({ onClose }) {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const getErrorText = (value) => {
     if (Array.isArray(value)) return value[0];
@@ -240,13 +243,18 @@ function ChangePasswordModal({ onClose }) {
           <form onSubmit={handleSubmit} className="profile-modal-form">
             <div className="profile-modal-field">
               <label>Current Password</label>
-              <input
-                className="profile-modal-input"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-              />
+              <div className="password-wrapper">
+                <input
+                  className="profile-modal-input"
+                  type={showCurrent ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowCurrent(v => !v)}>
+                  {showCurrent ? "Hide" : "Show"}
+                </button>
+              </div>
               {errors.current_password && (
                 <span className="profile-modal-error">
                   {getErrorText(errors.current_password)}
@@ -256,13 +264,18 @@ function ChangePasswordModal({ onClose }) {
 
             <div className="profile-modal-field">
               <label>New Password</label>
-              <input
-                className="profile-modal-input"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-              />
+              <div className="password-wrapper">
+                <input
+                  className="profile-modal-input"
+                  type={showNew ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowNew(v => !v)}>
+                  {showNew ? "Hide" : "Show"}
+                </button>
+              </div>
               {errors.new_password && (
                 <span className="profile-modal-error">
                   {getErrorText(errors.new_password)}
@@ -272,13 +285,18 @@ function ChangePasswordModal({ onClose }) {
 
             <div className="profile-modal-field">
               <label>Confirm New Password</label>
-              <input
-                className="profile-modal-input"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
+              <div className="password-wrapper">
+                <input
+                  className="profile-modal-input"
+                  type={showConfirm ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowConfirm(v => !v)}>
+                  {showConfirm ? "Hide" : "Show"}
+                </button>
+              </div>
               {errors.confirm_password && (
                 <span className="profile-modal-error">
                   {getErrorText(errors.confirm_password)}

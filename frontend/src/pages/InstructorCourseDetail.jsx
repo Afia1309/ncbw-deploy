@@ -592,7 +592,7 @@ export default function InstructorCourseDetail() {
     setQuizQuestions((prev) =>
       prev.map((question) =>
         question.id === questionId
-          ? { ...question, points: value === "" ? "" : Number(value) }
+          ? { ...question, points: value }
           : question
       )
     );
@@ -757,6 +757,12 @@ export default function InstructorCourseDetail() {
     }
     if (isFileItem && itemModalMode === "create" && !newItemFile) {
       errors.file = `A ${newItemType} file is required.`;
+    }
+    if (newItemFile) {
+      const MAX_MB = backendType === "video" ? 500 : 50;
+      if (newItemFile.size > MAX_MB * 1024 * 1024) {
+        errors.file = `File is too large. Maximum size is ${MAX_MB} MB.`;
+      }
     }
     if ((backendType === "external_video" || backendType === "link") && !newItemExternalUrl.trim()) {
       errors.url = "A URL is required.";

@@ -743,22 +743,22 @@ export default function CourseMaterial() {
 
                     {/* Unanswered confirmation warning */}
                     {confirmUnanswered > 0 && !submitted && (
-                      <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px 14px", marginBottom: "12px" }}>
-                        <p style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#92400e" }}>
+                      <div style={{ background: "#f9fafb", border: "1px solid #e4e7ec", borderRadius: "8px", padding: "12px 14px", marginBottom: "12px" }}>
+                        <p style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#374151" }}>
                           {confirmUnanswered} question{confirmUnanswered !== 1 ? "s" : ""} left unanswered — {confirmUnanswered !== 1 ? "they" : "it"} will be marked incorrect.
                         </p>
                         <div style={{ display: "flex", gap: "8px" }}>
                           <button
                             type="button"
                             onClick={() => setConfirmUnanswered(false)}
-                            style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #d97706", background: "#fff", color: "#92400e", cursor: "pointer", fontSize: "0.84rem" }}
+                            style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #e4e7ec", background: "#fff", color: "#374151", cursor: "pointer", fontSize: "0.84rem" }}
                           >
                             Go back
                           </button>
                           <button
                             type="button"
                             onClick={actuallySubmitQuiz}
-                            style={{ padding: "6px 12px", borderRadius: "6px", border: "none", background: "#d97706", color: "#fff", cursor: "pointer", fontSize: "0.84rem" }}
+                            style={{ padding: "6px 12px", borderRadius: "6px", border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontSize: "0.84rem" }}
                           >
                             Submit anyway
                           </button>
@@ -816,11 +816,7 @@ export default function CourseMaterial() {
                               </span>
                             )}
                           </button>
-                        ) : (
-                          <p style={{ fontSize: "0.84rem", color: "#dc2626", margin: 0 }}>
-                            No attempts remaining.
-                          </p>
-                        )}
+                        ) : null}
                       </div>
                     )}
                   </>

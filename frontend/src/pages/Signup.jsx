@@ -8,6 +8,7 @@ const POSITIONS = [
   "President",
   "Vice President",
   "Treasurer",
+  "Secretary",
   "Chaplain",
   "Parliamentarian",
   "General Member",

@@ -22,9 +22,9 @@ export default function InstructorCourses() {
         setLoading(true);
         setError("");
 
-        const token = 
+        const token =
             localStorage.getItem("access") ||
-            localStorage.getItem(access_token) ||
+            localStorage.getItem("access_token") ||
             "";
             
         const response = await fetch(`${API_BASE}/instructor/courses/`, {

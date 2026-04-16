@@ -99,6 +99,26 @@
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14);
 }
 
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper .profile-modal-input {
+  padding-right: 3.5rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+
 .profile-modal-error {
   margin: 0;
   font-size: 13px;

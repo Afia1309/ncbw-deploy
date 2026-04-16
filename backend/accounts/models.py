@@ -210,7 +210,7 @@ class PasswordResetToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     used = models.BooleanField(default=False)
 
-    EXPIRY_MINUTES = 30
+    EXPIRY_MINUTES = 10
 
     def is_valid(self):
         from django.utils import timezone

@@ -19,7 +19,14 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   });
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  if (!response.ok) {
+    let detail = `Request failed: ${response.status}`;
+    try {
+      const errData = await response.json();
+      if (errData?.detail) detail = errData.detail;
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
   if (response.status === 204) return null;
   return response.json();
 }
@@ -244,8 +251,8 @@ function ComposePanel({ courses }) {
       setResult({ ok: true, text: `Sent to ${data.sent_to} member${data.sent_to !== 1 ? "s" : ""}.` });
       setTitle("");
       setMessage("");
-    } catch {
-      setResult({ ok: false, text: "Failed to send. Please try again." });
+    } catch (err) {
+      setResult({ ok: false, text: err?.message || "Failed to send. Please try again." });
     } finally {
       setSending(false);
     }

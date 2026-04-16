@@ -613,24 +613,28 @@ class InstructorNotifyView(APIView):
             notification_type = "info"
 
        
-        trainees = User.objects.filter(
-            profile__role="trainee",
-            profile__status="active",
-        ).select_related("profile")
+        try:
+            trainees = User.objects.filter(
+                profile__role="trainee",
+                profile__status="active",
+            ).select_related("profile").prefetch_related("profile")
 
-        enrolled = [u for u in trainees if course_matches_user(course, u)]
+            enrolled = [u for u in trainees if course_matches_user(course, u)]
 
-        notifications = [
-            Notification(
-                user=u,
-                course=course,
-                title=title,
-                message=message,
-                notification_type=notification_type,
-            )
-            for u in enrolled
-        ]
-        Notification.objects.bulk_create(notifications)
+            notifications = [
+                Notification(
+                    user=u,
+                    course=course,
+                    title=title,
+                    message=message,
+                    notification_type=notification_type,
+                )
+                for u in enrolled
+            ]
+            if notifications:
+                Notification.objects.bulk_create(notifications)
+        except Exception as e:
+            return Response({"detail": f"Failed to send notifications: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"sent_to": len(enrolled)}, status=status.HTTP_201_CREATED)
 
