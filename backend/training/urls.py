@@ -20,6 +20,7 @@ urlpatterns = [
     path("courses/<int:course_id>/", views.TraineeCourseDetailView.as_view(), name="trainee-course-detail"),
     path("courses/<int:course_id>/feedback/", views.submit_course_feedback, name="submit-course-feedback"),
     path("items/<int:item_id>/progress/", views.update_item_progress, name="item-progress-update"),
+    path("items/<int:item_id>/submit-quiz/", views.submit_quiz, name="quiz-submit"),
 
     path('certificate/', views.get_certificate, name='certificate'),
     path('certificate/pdf/', views.download_certificate_pdf, name='certificate_pdf'),

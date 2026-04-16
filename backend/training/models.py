@@ -144,6 +144,28 @@ class ItemMemberAccess(models.Model):
         return f"{self.item.title} -> {self.user.username}"
 
 
+class QuizAttempt(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="quiz_attempts",
+    )
+    item = models.ForeignKey(
+        Item,
+        on_delete=models.CASCADE,
+        related_name="quiz_attempts",
+    )
+    score_percent = models.FloatField(default=0)
+    passed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.item.title} - {self.score_percent}%"
+
+
 class ItemProgress(models.Model):
     STATUS_CHOICES = [
         ("not_started", "Not Started"),

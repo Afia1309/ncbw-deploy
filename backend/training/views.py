@@ -14,12 +14,15 @@ from accounts.serializers import CourseSerializer
 from notifications.models import Notification
 from notifications.utils import notify_trainee_course_assigned
 
+from django.db.models import Count
+
 from .models import (
     CourseMemberAccess,
     CoursePositionAccess,
     Item,
     ItemProgress,
     Module,
+    QuizAttempt,
 )
 
 from .serializers import (
@@ -531,11 +534,21 @@ class TraineeCourseDetailView(APIView):
             return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
 
         visible_items = visible_items_for_user(course, request.user)
+        visible_item_ids = [item.id for item in visible_items]
+
         progress_rows = ItemProgress.objects.filter(
             user=request.user,
-            item_id__in=[item.id for item in visible_items],
+            item_id__in=visible_item_ids,
         )
         progress_map = {row.item_id: row.status for row in progress_rows}
+
+        quiz_attempts_map = {
+            row["item_id"]: row["count"]
+            for row in QuizAttempt.objects.filter(
+                user=request.user,
+                item_id__in=visible_item_ids,
+            ).values("item_id").annotate(count=Count("id"))
+        }
 
         modules = course.modules.filter(is_visible=True).order_by("order", "id")
         modules_data = TraineeModuleSerializer(
@@ -545,6 +558,7 @@ class TraineeCourseDetailView(APIView):
                 "request": request,
                 "user": request.user,
                 "progress_map": progress_map,
+                "quiz_attempts_map": quiz_attempts_map,
                 "item_matcher": item_matches_user,
             },
         ).data
@@ -691,6 +705,72 @@ def update_item_progress(request, item_id):
         "status": progress.status,
         "completed_at": progress.completed_at,
     })
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def submit_quiz(request, item_id):
+    try:
+        item = Item.objects.select_related("module__course").get(id=item_id)
+    except Item.DoesNotExist:
+        return Response({"detail": "Item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if item.item_type != "quiz":
+        return Response({"detail": "This item is not a quiz."}, status=status.HTTP_400_BAD_REQUEST)
+
+    course = item.module.course
+    if not (course_matches_user(course, request.user) or is_admin(request.user)):
+        return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+    if not item_matches_user(item, request.user):
+        return Response({"detail": "Not allowed for this item."}, status=status.HTTP_403_FORBIDDEN)
+
+    quiz_data = item.quiz_data or {}
+    max_attempts = int(quiz_data.get("maxAttempts", 0))  # 0 = unlimited
+    attempts_used = QuizAttempt.objects.filter(user=request.user, item=item).count()
+
+    if max_attempts > 0 and attempts_used >= max_attempts:
+        return Response(
+            {
+                "detail": "You have reached the maximum number of attempts for this quiz.",
+                "attempts_used": attempts_used,
+                "max_attempts": max_attempts,
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    answers = request.data.get("answers", {})
+    questions = quiz_data.get("questions", [])
+    passing_grade = quiz_data.get("passingGrade", 70)
+
+    correct = 0
+    total = len(questions)
+    for q in questions:
+        if str(answers.get(str(q["id"]))) == str(q.get("correctOptionId")):
+            correct += 1
+
+    percent = round((correct / total) * 100) if total else 0
+    passed = percent >= passing_grade
+
+    QuizAttempt.objects.create(user=request.user, item=item, score_percent=percent, passed=passed)
+    attempts_used += 1
+
+    progress, _ = ItemProgress.objects.get_or_create(user=request.user, item=item)
+    if passed or progress.status != "completed":
+        progress.status = "completed" if passed else "in_progress"
+        progress.last_activity = timezone.now()
+        if passed:
+            progress.completed_at = timezone.now()
+        progress.save()
+
+    return Response({
+        "correct": correct,
+        "total": total,
+        "percent": percent,
+        "passed": passed,
+        "attempts_used": attempts_used,
+        "max_attempts": max_attempts,
+    })
+
 
 def _get_track_name(user):
     """Derive the training track name from the user's position."""

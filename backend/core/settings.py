@@ -27,11 +27,12 @@ SECRET_KEY = os.getenv(
     "django-insecure-#yf++ruk1#r(c^!^f1sjrrpigu8ks&ye5y=lvu7rrrv=uq$!z8"
 )
 
-DEBUG = os.getenv("DEBUG", "True") == "True"
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv(
-    "ALLOWED_HOSTS",
-    "localhost,127.0.0.1"
+    "127.0.0.1",
+    "localhost"
+    ".onrender.com"
 ).split(",")
 
 
@@ -99,6 +100,7 @@ SIMPLE_JWT = {
 # --------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -194,6 +196,8 @@ USE_TZ = True
 # Static files
 # --------------------------------------------------
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 # --------------------------------------------------
@@ -216,7 +220,7 @@ _cors_origins = os.getenv(
     "CORS_ALLOWED_ORIGINS",
     "http://localhost:5173,http://127.0.0.1:5173"
 )
-CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+CORS_ALLOWED_ORIGINS = ["https://ncbw-frontend.vercel.app"]
 
 
 # --------------------------------------------------
@@ -241,11 +245,17 @@ EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-EMAIL_HOST_USER = "nationalcoalitionbw@gmail.com"
-EMAIL_HOST_PASSWORD = "pjlopxsfyuvsljjr"
-DEFAULT_FROM_EMAIL = "nationalcoalitionbw@gmail.com"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv("EMAIL_HOST_USER", "")
 
 # --------------------------------------------------
 # Default email fallback
 # --------------------------------------------------
 DEFAULT_FROM_EMAIL = POSTMARK_FROM_EMAIL or "no-reply@ncbw-training.local"
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://ncbw-frontend.vercel.app",
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

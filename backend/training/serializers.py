@@ -9,6 +9,7 @@ from .models import (
     ItemMemberAccess,
     ItemPositionAccess,
     Module,
+    QuizAttempt,
 )
 
 
@@ -90,6 +91,7 @@ class TraineeItemSerializer(serializers.ModelSerializer):
     visible = serializers.BooleanField(source="is_visible", read_only=True)
     file_url = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    attempts_used = serializers.SerializerMethodField()
 
     class Meta:
         model = Item
@@ -105,6 +107,7 @@ class TraineeItemSerializer(serializers.ModelSerializer):
             "due_date",
             "order",
             "status",
+            "attempts_used",
         ]
 
     def get_file_url(self, obj):
@@ -118,6 +121,12 @@ class TraineeItemSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         progress_map = self.context.get("progress_map", {})
         return progress_map.get(obj.id, "not_started")
+
+    def get_attempts_used(self, obj):
+        if obj.item_type != "quiz":
+            return None
+        quiz_attempts_map = self.context.get("quiz_attempts_map", {})
+        return quiz_attempts_map.get(obj.id, 0)
 
 
 class ModuleDetailSerializer(serializers.ModelSerializer):
@@ -173,6 +182,7 @@ class TraineeModuleSerializer(serializers.ModelSerializer):
             context={
                 "request": self.context.get("request"),
                 "progress_map": progress_map,
+                "quiz_attempts_map": self.context.get("quiz_attempts_map", {}),
             },
         ).data
 

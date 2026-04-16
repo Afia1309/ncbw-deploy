@@ -323,74 +323,47 @@ def register(request):
         if not is_valid:
             errors["password"] = [pwd_error]
 
-        # Case 1: activating an invited account — member_id was sent in the invite email
-        invited_user = User.objects.filter(username=member_id).first() if member_id else None
+        # Signup is invite-only — a valid member_id must be present
+        if not member_id:
+            return Response(
+                {"detail": "Registration is by invitation only."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        if invited_user:
+        invited_user = User.objects.filter(username=member_id).first()
+
+        if not invited_user or invited_user.profile.status != "pending":
+            errors["member_id"] = ["Invalid or already-used invitation link."]
+
+        if invited_user and invited_user.profile.status == "pending":
             if invited_user.email.lower() != email:
                 errors["email"] = ["This email does not match the invited account."]
-            elif invited_user.profile.status == "deleted":
-                errors["member_id"] = ["This account is no longer available."]
-        else:
-            # Case 2: direct self-registration — ID will be auto-generated
-            if User.objects.filter(email__iexact=email).exists():
-                errors["email"] = ["This email is already registered."]
 
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            if invited_user and invited_user.profile.status == "pending":
-                user = invited_user
-                user.first_name = first_name or user.first_name
-                user.last_name = last_name or user.last_name
-                user.email = email
-                user.set_password(password)
-                user.is_active = True
-                user.save()
+            user = invited_user
+            user.first_name = first_name or user.first_name
+            user.last_name = last_name or user.last_name
+            user.email = email
+            user.set_password(password)
+            user.is_active = True
+            user.save()
 
-                profile = user.profile
-                # Keep invited role/id; only update contact fields
-                profile.phone = phone_number or profile.phone
-                if profile.role == "trainee":
-                    profile.position = position or profile.position
-                profile.status = "active"
-                profile.activated_at = timezone.now()
-                profile.save()
+            profile = user.profile
+            # Keep invited role/id; only update contact fields
+            profile.phone = phone_number or profile.phone
+            if profile.role == "trainee":
+                profile.position = position or profile.position
+            profile.status = "active"
+            profile.activated_at = timezone.now()
+            profile.save()
 
-                if hasattr(user, "login_security"):
-                    user.login_security.reset()
-                else:
-                    LoginSecurity.objects.create(user=user)
-
+            if hasattr(user, "login_security"):
+                user.login_security.reset()
             else:
-                # Auto-generate the ID with the correct role prefix
-                auto_id = generate_user_id(role)
-
-                user = User.objects.create_user(
-                    username=auto_id,
-                    email=email,
-                    password=password,
-                    first_name=first_name,
-                    last_name=last_name,
-                    is_active=True,
-                )
-
-                if hasattr(user, "profile"):
-                    profile = user.profile
-                else:
-                    profile = Profile.objects.create(user=user)
-
-                profile.member_id = auto_id
-                profile.phone = phone_number or ""
-                profile.position = position
-                profile.role = role
-                profile.status = "active"
-                profile.activated_at = timezone.now()
-                profile.save()
-
-                if not hasattr(user, "login_security"):
-                    LoginSecurity.objects.create(user=user)
+                LoginSecurity.objects.create(user=user)
 
         return Response(
             {
