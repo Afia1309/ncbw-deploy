@@ -306,6 +306,8 @@ export default function MemberDashboard() {
       required: course.required ?? true,
       locked: course.locked ?? false,
       progress_percent: p.percent,
+      items_completed: p.completed || 0,
+      items_total: p.total || 0,
     };
   });
 
@@ -314,10 +316,14 @@ export default function MemberDashboard() {
   const inProgressCount = courseItems.filter((c) => c.status === "in_progress").length;
   const notStartedCount = courseItems.filter((c) => c.status === "not_started").length;
 
+  // Item-level aggregation for the progress ring (more accurate than course-level count)
+  const totalItems = requiredOnly.reduce((sum, c) => sum + c.items_total, 0);
+  const completedItems = requiredOnly.reduce((sum, c) => sum + c.items_completed, 0);
+
   const progress = {
     completed_required: completedCount,
     total_required: requiredOnly.length,
-    percent_complete: requiredOnly.length > 0 ? Math.round((completedCount / requiredOnly.length) * 100) : 0,
+    percent_complete: totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0,
   };
 
   const activityStream = buildActivityStream(courseItems, notifications);

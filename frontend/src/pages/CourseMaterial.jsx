@@ -88,6 +88,59 @@ function IconArrowRight() {
   );
 }
 
+function IconDownload() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function IconOpenTab() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+function PdfBlock({ fileUrl }) {
+  if (!fileUrl) {
+    return (
+      <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "20px 18px", background: "#fafafa", color: "#98a2b3", fontSize: "0.88rem" }}>
+        File not available.
+      </div>
+    );
+  }
+
+  const fileName = fileUrl.split("/").pop();
+  const iconBtnStyle = {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    padding: "6px 9px", border: "1px solid #e4e7ec", borderRadius: "8px",
+    background: "#fff", color: "#344054", textDecoration: "none", cursor: "pointer",
+    flexShrink: 0,
+  };
+
+  return (
+    <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "14px 16px", background: "#fafafa", display: "flex", alignItems: "center", gap: "12px" }}>
+      <div style={{ color: "#667085", flexShrink: 0 }}><IconDocument /></div>
+      <span style={{ flex: 1, fontSize: "0.85rem", color: "#344054", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {fileName}
+      </span>
+      <a href={fileUrl} target="_blank" rel="noreferrer" title="Open in new tab" style={iconBtnStyle}>
+        <IconOpenTab />
+      </a>
+      <a href={fileUrl} download title="Download" style={iconBtnStyle}>
+        <IconDownload />
+      </a>
+    </div>
+  );
+}
+
 function ItemTypeIcon({ item }) {
   const type = getItemType(item);
   const map = {
@@ -662,29 +715,8 @@ export default function CourseMaterial() {
             ) : itemType === "external_video" && item?.external_url ? (
               <ExternalVideoPlayer url={item.external_url} />
 
-            ) : itemType === "pdf" && item?.file_url ? (
-              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", overflow: "hidden" }}>
-                <object
-                  data={item.file_url}
-                  type="application/pdf"
-                  width="100%"
-                  style={{ display: "block", height: "600px", border: "none" }}
-                >
-                  <div style={{ padding: "20px", background: "#fafafa", color: "#667085", fontSize: "0.88rem" }}>
-                    Preview not available in this browser.
-                  </div>
-                </object>
-                <div style={{ padding: "12px 16px", borderTop: "1px solid #e4e7ec", background: "#fafafa", display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{ color: "#667085" }}><IconDocument /></div>
-                  <span style={{ flex: 1, fontSize: "0.82rem", color: "#98a2b3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.file_url.split("/").pop()}
-                  </span>
-                  <a href={item.file_url} download className="secondary-btn"
-                    style={{ textDecoration: "none", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                    Download
-                  </a>
-                </div>
-              </div>
+            ) : itemType === "pdf" ? (
+              <PdfBlock fileUrl={item?.file_url} />
 
             ) : itemType === "link" && item?.external_url ? (
               <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "16px 18px", background: "#fafafa", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>

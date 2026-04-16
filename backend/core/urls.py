@@ -20,9 +20,19 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.views import CustomTokenObtainPairView
+
+
+def serve_media(request, path):
+    """Serve uploaded media files without X-Frame-Options so PDFs can be
+    embedded cross-origin in an <iframe> on the frontend."""
+    return serve(request, path, document_root=settings.MEDIA_ROOT)
+
+serve_media = xframe_options_exempt(serve_media)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -36,7 +46,7 @@ urlpatterns = [
     path('api/training/', include('training.urls')),
     path('api/notifications/', include('notifications.urls')),
 
-    # Media files — served in all environments (static() only works in DEBUG)
-    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    # Media files — served in all environments without X-Frame-Options restriction
+    re_path(r'^media/(?P<path>.*)$', serve_media),
 ]
 
