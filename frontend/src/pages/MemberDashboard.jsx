@@ -57,7 +57,7 @@ function buildActivityStream(courses, notifications) {
     .slice(0, 3);
 
   notifItems.forEach((n) => {
-    items.push({ id: `notif-${n.id}`, type: "notif", notifType: n.notification_type, title: n.title, message: n.message, is_read: n.is_read, courseId: n.course_id, courseName: n.course_name });
+    items.push({ id: `notif-${n.id}`, notifId: n.id, type: "notif", notifType: n.notification_type, title: n.title, message: n.message, is_read: n.is_read, courseId: n.course_id, courseName: n.course_name });
   });
 
   // Sort: urgent due dates first, then by days
@@ -87,7 +87,18 @@ const NOTIF_COLORS = {
   info:         { dot: "#6b7280", label: "Info",         bg: "#f9fafb" },
 };
 
-function ActivityItem({ item, onNavigate }) {
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+  );
+}
+
+function ActivityItem({ item, onNavigate, onDelete }) {
   if (item.type === "due") {
     const c = URGENCY_COLORS[item.urgency] || URGENCY_COLORS.normal;
     return (
@@ -110,6 +121,7 @@ function ActivityItem({ item, onNavigate }) {
   }
 
   const nc = NOTIF_COLORS[item.notifType] || NOTIF_COLORS.info;
+  const canDelete = item.notifType === "reminder" || item.notifType === "general";
   return (
     <div className="act-item" style={{ borderLeft: `3px solid ${nc.dot}` }}>
       <div className="act-item__left">
@@ -121,15 +133,80 @@ function ActivityItem({ item, onNavigate }) {
           {item.courseName && <span className="act-item__course"> · {item.courseName}</span>}
         </span>
       </div>
-      {item.courseId && (
-        <button
-          type="button"
-          className="secondary-btn act-view-btn"
-          onClick={() => onNavigate(`/member/course/${item.courseId}`)}
-        >
-          View
-        </button>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        {item.courseId && (
+          <button
+            type="button"
+            className="secondary-btn act-view-btn"
+            onClick={() => onNavigate(`/member/course/${item.courseId}`)}
+          >
+            View
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(item.notifId)}
+            style={{ border: "none", background: "none", padding: "4px", cursor: "pointer", color: "#98a2b3", display: "inline-flex", alignItems: "center" }}
+            title="Delete notification"
+          >
+            <TrashIcon />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+
+function DeleteConfirmModal({ onCancel, onConfirm }) {
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.28)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 1000, padding: "24px",
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "420px",
+          padding: "24px 28px 28px", boxShadow: "0 8px 40px rgba(0,0,0,0.14)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+          <span style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>Delete notification?</span>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{ background: "none", border: "none", fontSize: "24px", color: "#9ca3af", cursor: "pointer", lineHeight: 1, padding: 0 }}
+            aria-label="Close"
+          >×</button>
+        </div>
+        <p style={{ fontSize: "0.9rem", color: "#374151", margin: "0 0 24px" }}>
+          This will permanently remove the notification. This action cannot be undone.
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button type="button" className="secondary-btn" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={{
+              background: "#dc2626", color: "#fff", border: "none", borderRadius: "8px",
+              padding: "8px 18px", fontWeight: 700, fontSize: "13px", cursor: "pointer",
+            }}
+            onClick={onConfirm}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -142,11 +219,25 @@ export default function MemberDashboard() {
   const [courses, setCourses] = useState([]);
   const [profile, setProfile] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  const confirmDelete = async () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    try {
+      const token = getToken();
+      await fetch(`${API_BASE}/api/notifications/${id}/delete/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch { /* silent */ }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -296,7 +387,7 @@ export default function MemberDashboard() {
           ) : (
             <div className="act-stream">
               {activityStream.slice(0, 5).map((item) => (
-                <ActivityItem key={item.id} item={item} onNavigate={navigate} />
+                <ActivityItem key={item.id} item={item} onNavigate={navigate} onDelete={setPendingDeleteId} />
               ))}
             </div>
           )}
@@ -369,6 +460,13 @@ export default function MemberDashboard() {
           </div>
         </section>
       </div>
+
+      {pendingDeleteId !== null && (
+        <DeleteConfirmModal
+          onCancel={() => setPendingDeleteId(null)}
+          onConfirm={confirmDelete}
+        />
+      )}
     </MemberLayout>
   );
 }

@@ -243,6 +243,9 @@ export default function CourseMaterial() {
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(null);
+  const [confirmUnanswered, setConfirmUnanswered] = useState(false);
+  const [attemptsUsed, setAttemptsUsed] = useState(0);
+  const [maxAttempts, setMaxAttempts] = useState(0);
   const [courseTitle, setCourseTitle] = useState(location.state?.courseTitle || "");
   const [moduleTitle, setModuleTitle] = useState(location.state?.moduleTitle || "");
   const [moduleId, setModuleId] = useState(location.state?.moduleId || null);
@@ -370,58 +373,73 @@ export default function CourseMaterial() {
     }
   };
 
+  // Sync attempt info whenever the active item changes
+  useEffect(() => {
+    if (item) {
+      setAttemptsUsed(item.attempts_used ?? 0);
+      setMaxAttempts(item.quiz_data?.maxAttempts ?? 0);
+      setSubmitted(false);
+      setScore(null);
+      setAnswers({});
+      setConfirmUnanswered(false);
+    }
+  }, [item?.id]);
+
   const handleSelect = (questionId, optionId) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionId,
-    }));
+    setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
   };
 
-  const handleSubmitQuiz = async () => {
-    if (!item?.quiz_data?.questions) return;
-
-    let correct = 0;
-    const total = item.quiz_data.questions.length;
-
-    item.quiz_data.questions.forEach((q) => {
-      if (answers[q.id] === q.correctOptionId) {
-        correct += 1;
-      }
-    });
-
-    const percent = Math.round((correct / total) * 100);
-    const passed = percent >= item.quiz_data.passingGrade;
-
-    setScore({
-      correct,
-      total,
-      percent,
-      passed: percent >= item.quiz_data.passingGrade,
-    });
-    
-    setSubmitted(true);
-
-    {/* Automatically mark as completed if passing grade is recieved */}
+  const actuallySubmitQuiz = async () => {
+    setConfirmUnanswered(false);
     try {
       const token = getToken();
-      const newStatus = passed ? "completed" : "in_progress";
-      await updateItemStatus(item.id, newStatus, token);
-    } catch (err) {
-      console.error("Failed to update item status:", err);
+      const response = await fetch(`${API_BASE}/api/training/items/${item.id}/submit-quiz/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ answers }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 403 && data.attempts_used !== undefined) {
+          setAttemptsUsed(data.attempts_used);
+          setMaxAttempts(data.max_attempts);
+          setError(data.detail);
+        } else {
+          setError(data.detail || "Failed to submit quiz.");
+        }
+        return;
+      }
+      setScore({ correct: data.correct, total: data.total, percent: data.percent, passed: data.passed });
+      setSubmitted(true);
+      setAttemptsUsed(data.attempts_used);
+      setMaxAttempts(data.max_attempts);
+      // Sync item status in sidebar
+      const newStatus = data.passed ? "completed" : "in_progress";
+      setItem((prev) => ({ ...prev, status: newStatus }));
+      setModuleItems((prev) =>
+        prev.map((e) => String(e.id) === String(item.id) ? { ...e, status: newStatus } : e)
+      );
+    } catch {
+      setError("Could not submit quiz. Please try again.");
     }
+  };
 
-    console.log("Submitting quiz...");
-    console.log("Quiz Result:", {
-      correct,
-      total,
-      percent,
-    });
+  const handleSubmitQuiz = () => {
+    if (!item?.quiz_data?.questions) return;
+    const unanswered = item.quiz_data.questions.filter((q) => answers[q.id] === undefined).length;
+    if (unanswered > 0) {
+      setConfirmUnanswered(unanswered);
+      return;
+    }
+    actuallySubmitQuiz();
   };
 
   const handleRetakeQuiz = () => {
+    if (maxAttempts > 0 && attemptsUsed >= maxAttempts) return;
     setAnswers({});
     setSubmitted(false);
     setScore(null);
+    setConfirmUnanswered(false);
   };
 
   if (loading) return <MemberLayout title="Loading..."><div className="dash-loading">Loading...</div></MemberLayout>;
@@ -685,6 +703,15 @@ export default function CourseMaterial() {
             ) : itemType === "quiz" ? (
               <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px 20px" }}>
 
+                {/* Attempts info */}
+                {maxAttempts > 0 && (
+                  <div style={{ marginBottom: "14px", fontSize: "0.82rem", color: attemptsUsed >= maxAttempts ? "#dc2626" : "#667085" }}>
+                    {attemptsUsed >= maxAttempts
+                      ? "No attempts remaining."
+                      : `Attempt ${attemptsUsed + 1} of ${maxAttempts}`}
+                  </div>
+                )}
+
                 {item?.quiz_data?.questions?.length ? (
                   <>
                     {item.quiz_data.questions.map((q, qIndex) => (
@@ -697,14 +724,15 @@ export default function CourseMaterial() {
                         {q.options.map((opt) => (
                           <label
                             key={opt.id}
-                            style={{ display: "block", marginBottom: "6px", cursor: "pointer" }}
+                            style={{ display: "block", marginBottom: "6px", cursor: submitted ? "default" : "pointer" }}
                           >
                             <input
                               type="radio"
                               name={`question-${q.id}`}
                               value={opt.id}
                               checked={answers[q.id] === opt.id}
-                              onChange={() => handleSelect(q.id, opt.id)}
+                              onChange={() => { if (!submitted) handleSelect(q.id, opt.id); }}
+                              disabled={submitted}
                               style={{ marginRight: "8px" }}
                             />
                             {opt.text}
@@ -713,10 +741,35 @@ export default function CourseMaterial() {
                       </div>
                     ))}
 
-                    {!submitted && (
+                    {/* Unanswered confirmation warning */}
+                    {confirmUnanswered > 0 && !submitted && (
+                      <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px 14px", marginBottom: "12px" }}>
+                        <p style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#92400e" }}>
+                          {confirmUnanswered} question{confirmUnanswered !== 1 ? "s" : ""} left unanswered — {confirmUnanswered !== 1 ? "they" : "it"} will be marked incorrect.
+                        </p>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmUnanswered(false)}
+                            style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #d97706", background: "#fff", color: "#92400e", cursor: "pointer", fontSize: "0.84rem" }}
+                          >
+                            Go back
+                          </button>
+                          <button
+                            type="button"
+                            onClick={actuallySubmitQuiz}
+                            style={{ padding: "6px 12px", borderRadius: "6px", border: "none", background: "#d97706", color: "#fff", cursor: "pointer", fontSize: "0.84rem" }}
+                          >
+                            Submit anyway
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!submitted && confirmUnanswered === false && !(maxAttempts > 0 && attemptsUsed >= maxAttempts) && (
                       <button
+                        type="button"
                         onClick={handleSubmitQuiz}
-                        disabled={submitted}
                         style={{
                           marginTop: "10px",
                           padding: "8px 14px",
@@ -733,31 +786,41 @@ export default function CourseMaterial() {
 
                     {submitted && score && (
                       <div style={{ marginTop: "15px" }}>
-                        <h3>Results</h3>
+                        <h3 style={{ marginBottom: "8px" }}>Results</h3>
 
-                        <p>
+                        <p style={{ margin: "0 0 6px" }}>
                           Score: {score.correct} / {score.total} ({score.percent}%)
                         </p>
 
-                        <p style={{ color: score.passed ? "green" : "red" }}>
-                          {score.passed ? "Passed! " : "Did not pass "}
+                        <p style={{ margin: "0 0 12px", color: score.passed ? "#16a34a" : "#dc2626" }}>
+                          {score.passed ? "Passed!" : "Did not pass."}
                         </p>
 
-                        <button
-                          onClick={handleRetakeQuiz}
-                          style={{
-                            marginTop: "10px",
-                            padding: "8px 14px",
-                            borderRadius: "8px",
-                            border: "1px solid #e4e7ec",
-                            background: "#f3f4f6",
-                            color: "#111",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Retake Quiz
-                        </button>
-
+                        {maxAttempts === 0 || attemptsUsed < maxAttempts ? (
+                          <button
+                            type="button"
+                            onClick={handleRetakeQuiz}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: "8px",
+                              border: "1px solid #e4e7ec",
+                              background: "#f3f4f6",
+                              color: "#111",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Retake Quiz
+                            {maxAttempts > 0 && (
+                              <span style={{ fontSize: "0.78rem", color: "#667085", marginLeft: "6px" }}>
+                                ({maxAttempts - attemptsUsed} left)
+                              </span>
+                            )}
+                          </button>
+                        ) : (
+                          <p style={{ fontSize: "0.84rem", color: "#dc2626", margin: 0 }}>
+                            No attempts remaining.
+                          </p>
+                        )}
                       </div>
                     )}
                   </>

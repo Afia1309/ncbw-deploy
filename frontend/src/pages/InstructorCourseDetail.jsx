@@ -166,6 +166,7 @@ export default function InstructorCourseDetail() {
 
   const [quizQuestions, setQuizQuestions] = useState([createBlankQuestion()]);
   const [quizPassingGrade, setQuizPassingGrade] = useState(70);
+  const [quizMaxAttempts, setQuizMaxAttempts] = useState(0);
 
   const [enrollmentSearch, setEnrollmentSearch] = useState("");
   const [enrollmentSort, setEnrollmentSort] = useState("default");
@@ -535,6 +536,7 @@ export default function InstructorCourseDetail() {
 
     if (item.type === "Quiz") {
       setQuizPassingGrade(item.quiz?.passingGrade ?? 70);
+      setQuizMaxAttempts(item.quiz?.maxAttempts ?? 0);
       setQuizQuestions(normalizeQuizQuestions(item.quiz));
     }
 
@@ -670,6 +672,7 @@ export default function InstructorCourseDetail() {
       payload.quiz_data = {
         autoGrade: true,
         passingGrade: Number(quizPassingGrade || 0),
+        maxAttempts: Number(quizMaxAttempts || 0),
         questions: cleanedQuestions,
         totalPoints: calculateQuizTotalPoints(cleanedQuestions),
       };
@@ -1027,6 +1030,21 @@ export default function InstructorCourseDetail() {
                 onChange={(e) => setQuizPassingGrade(e.target.value)}
                 placeholder="70"
               />
+            </div>
+
+            <div className="modal-field">
+              <label>Max Attempts</label>
+              <input
+                type="number"
+                min="0"
+                value={quizMaxAttempts}
+                onChange={(e) => setQuizMaxAttempts(e.target.value)}
+                placeholder="0"
+                title="0 = unlimited"
+              />
+              <span style={{ fontSize: "0.75rem", color: "#98a2b3", marginTop: "3px", display: "block" }}>
+                0 = unlimited
+              </span>
             </div>
 
             <div className="quiz-total-points-box">

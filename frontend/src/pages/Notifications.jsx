@@ -47,6 +47,46 @@ const FILTER_MAP = {
   "Messages":      ["general", "info", "warning", "success"],
 };
 
+const DELETABLE_TYPES = new Set(["reminder", "general"]);
+
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+
+function DeleteConfirmModal({ onCancel, onConfirm }) {
+  return (
+    <div className="ntf-overlay" onClick={onCancel}>
+      <div className="ntf-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="ntf-modal-header">
+          <span style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>Delete notification?</span>
+          <button type="button" className="ntf-modal-close" onClick={onCancel} aria-label="Close">×</button>
+        </div>
+        <p style={{ fontSize: "0.9rem", color: "#374151", margin: "0 0 24px" }}>
+          This will permanently remove the notification. This action cannot be undone.
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button
+            type="button"
+            className="ntf-markall-btn"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={{
+              background: "#dc2626", color: "#fff", border: "none",
+              borderRadius: "8px", padding: "8px 18px", fontWeight: 700,
+              fontSize: "13px", cursor: "pointer",
+            }}
+            onClick={onConfirm}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Full message modal ────────────────────────────────────────────────────────
 
 function MessageModal({ notification, onClose, onMarkRead }) {
@@ -94,8 +134,9 @@ function MessageModal({ notification, onClose, onMarkRead }) {
 
 // ── Notification row ──────────────────────────────────────────────────────────
 
-function NotificationRow({ notification, onRead, onOpen }) {
+function NotificationRow({ notification, onRead, onOpen, onDelete }) {
   const config = getTypeConfig(notification.notification_type);
+  const canDelete = DELETABLE_TYPES.has(notification.notification_type);
 
   return (
     <div
@@ -131,16 +172,34 @@ function NotificationRow({ notification, onRead, onOpen }) {
         <p className="ntf-row__preview">{notification.message}</p>
       </div>
 
-      {!notification.is_read && (
-        <button
-          type="button"
-          className="ntf-mark-btn"
-          onClick={(e) => { e.stopPropagation(); onRead(notification.id); }}
-          title="Mark as read"
-        >
-          Mark read
-        </button>
-      )}
+      <div className="ntf-row__actions" onClick={(e) => e.stopPropagation()}>
+        {!notification.is_read && (
+          <button
+            type="button"
+            className="ntf-mark-btn"
+            onClick={() => onRead(notification.id)}
+            title="Mark as read"
+          >
+            Mark read
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            className="ntf-delete-btn"
+            onClick={() => onDelete(notification.id)}
+            title="Delete notification"
+            aria-label="Delete notification"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4h6v2" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -153,6 +212,7 @@ export default function Notifications() {
   const [markingAll, setMarkingAll] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
   const [selected, setSelected] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const token = getToken();
 
   useEffect(() => {
@@ -167,6 +227,21 @@ export default function Notifications() {
     try {
       await markAsRead(id, token);
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    } catch { /* silent */ }
+  };
+
+  const handleDelete = async () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/notifications/${id}/delete/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        if (selected?.id === id) setSelected(null);
+      }
     } catch { /* silent */ }
   };
 
@@ -246,6 +321,7 @@ export default function Notifications() {
                 notification={n}
                 onRead={handleRead}
                 onOpen={setSelected}
+                onDelete={setPendingDeleteId}
               />
             ))}
           </div>
@@ -257,6 +333,13 @@ export default function Notifications() {
           notification={selected}
           onClose={() => setSelected(null)}
           onMarkRead={handleRead}
+        />
+      )}
+
+      {pendingDeleteId !== null && (
+        <DeleteConfirmModal
+          onCancel={() => setPendingDeleteId(null)}
+          onConfirm={handleDelete}
         />
       )}
     </MemberLayout>

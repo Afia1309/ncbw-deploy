@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import api from "../api/apiClient";
-import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import "../Auth.css";
 import bgImage from "../assets/login-bg.jpg";
 
@@ -18,7 +18,7 @@ export default function Signup() {
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const memberId = params.get("member_id");  
+  const memberId = params.get("member_id");
 
   const [role, setRole] = useState("trainee");
   const [firstName, setFirstName] = useState("");
@@ -31,10 +31,6 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agree, setAgree] = useState(false);
-
-  //const [searchParams] = useSearchParams();
-  //const invitedMemberId = searchParams.get("member_id");
-  //const isInvited = !!invitedMemberId;
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
@@ -94,6 +90,30 @@ export default function Signup() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Block direct access — signup is invite-only
+  if (!memberId) {
+    return (
+      <div className="auth-page" style={{ backgroundImage: `url(${bgImage})` }}>
+        <div className="auth-left">
+          <h1 className="auth-title">
+            Welcome to the NCBW-QCMC
+            <br />
+            Training Portal
+          </h1>
+        </div>
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <h1 style={{ marginBottom: "12px" }}>Invalid Invitation</h1>
+          <p style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: "24px" }}>
+            This page is only accessible via a valid invitation link. Please check your email for an invite from NCBW.
+          </p>
+          <button className="auth-button" onClick={() => navigate("/login")}>
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
