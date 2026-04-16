@@ -663,21 +663,24 @@ export default function CourseMaterial() {
               <ExternalVideoPlayer url={item.external_url} />
 
             ) : itemType === "pdf" && item?.file_url ? (
-              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px", background: "#fafafa", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-                <div style={{ color: "#667085" }}><IconDocument /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.85rem", color: "#344054", fontWeight: 500 }}>PDF Document</div>
-                  <div style={{ fontSize: "0.78rem", color: "#98a2b3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.file_url.split("/").pop()}
+              <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", overflow: "hidden" }}>
+                <object
+                  data={item.file_url}
+                  type="application/pdf"
+                  width="100%"
+                  style={{ display: "block", height: "600px", border: "none" }}
+                >
+                  <div style={{ padding: "20px", background: "#fafafa", color: "#667085", fontSize: "0.88rem" }}>
+                    Preview not available in this browser.
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <a href={item.file_url} target="_blank" rel="noreferrer" className="primary-btn"
-                    style={{ textDecoration: "none", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                    Open <IconExternalLink />
-                  </a>
+                </object>
+                <div style={{ padding: "12px 16px", borderTop: "1px solid #e4e7ec", background: "#fafafa", display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ color: "#667085" }}><IconDocument /></div>
+                  <span style={{ flex: 1, fontSize: "0.82rem", color: "#98a2b3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.file_url.split("/").pop()}
+                  </span>
                   <a href={item.file_url} download className="secondary-btn"
-                    style={{ textDecoration: "none", fontSize: "0.85rem" }}>
+                    style={{ textDecoration: "none", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
                     Download
                   </a>
                 </div>

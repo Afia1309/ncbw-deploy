@@ -759,9 +759,11 @@ export default function InstructorCourseDetail() {
       errors.file = `A ${newItemType} file is required.`;
     }
     if (newItemFile) {
-      const MAX_MB = backendType === "video" ? 500 : 50;
+      const MAX_MB = backendType === "video" ? 100 : 50;
       if (newItemFile.size > MAX_MB * 1024 * 1024) {
-        errors.file = `File is too large. Maximum size is ${MAX_MB} MB.`;
+        errors.file = backendType === "video"
+          ? `Video exceeds the maximum allowed upload size of ${MAX_MB} MB.`
+          : `File is too large. Maximum size is ${MAX_MB} MB.`;
       }
     }
     if ((backendType === "external_video" || backendType === "link") && !newItemExternalUrl.trim()) {

@@ -273,6 +273,13 @@ class ItemWriteSerializer(serializers.ModelSerializer):
         if item_type in ["pdf", "video"] and not file_obj:
             raise serializers.ValidationError({"file": ["This item type requires a file upload."]})
 
+        if item_type == "video" and file_obj and hasattr(file_obj, "size"):
+            MAX_VIDEO_MB = 100
+            if file_obj.size > MAX_VIDEO_MB * 1024 * 1024:
+                raise serializers.ValidationError(
+                    {"file": [f"Video exceeds the maximum allowed upload size of {MAX_VIDEO_MB} MB."]}
+                )
+
         if item_type in ["external_video", "link"] and not external_url:
             raise serializers.ValidationError({"external_url": ["This item type requires a URL."]})
 

@@ -243,31 +243,7 @@
 }
 
 .custom-checkbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #cbd5e1;
-  border-radius: 6px;
-  background: #ffffff;
-  position: relative;
-  flex-shrink: 0;
-  box-sizing: border-box;
-}
-
-.position-option.checked .custom-checkbox {
-  border-color: #c9a227;
-  background: #c9a227;
-}
-
-.position-option.checked .custom-checkbox::after {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 1px;
-  width: 5px;
-  height: 10px;
-  border: solid #ffffff;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  display: none;
 }
 
 .position-label {
