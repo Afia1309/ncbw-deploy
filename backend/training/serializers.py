@@ -92,6 +92,7 @@ class TraineeItemSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     attempts_used = serializers.SerializerMethodField()
+    last_attempt = serializers.SerializerMethodField()
 
     class Meta:
         model = Item
@@ -108,6 +109,7 @@ class TraineeItemSerializer(serializers.ModelSerializer):
             "order",
             "status",
             "attempts_used",
+            "last_attempt",
         ]
 
     def get_file_url(self, obj):
@@ -127,6 +129,12 @@ class TraineeItemSerializer(serializers.ModelSerializer):
             return None
         quiz_attempts_map = self.context.get("quiz_attempts_map", {})
         return quiz_attempts_map.get(obj.id, 0)
+
+    def get_last_attempt(self, obj):
+        if obj.item_type != "quiz":
+            return None
+        last_attempt_map = self.context.get("last_attempt_map", {})
+        return last_attempt_map.get(obj.id, None)
 
 
 class ModuleDetailSerializer(serializers.ModelSerializer):
@@ -183,6 +191,7 @@ class TraineeModuleSerializer(serializers.ModelSerializer):
                 "request": self.context.get("request"),
                 "progress_map": progress_map,
                 "quiz_attempts_map": self.context.get("quiz_attempts_map", {}),
+                "last_attempt_map": self.context.get("last_attempt_map", {}),
             },
         ).data
 
@@ -286,8 +295,21 @@ class ItemWriteSerializer(serializers.ModelSerializer):
         if item_type == "text" and not text_content:
             raise serializers.ValidationError({"text_content": ["Text content is required."]})
 
-        if item_type == "quiz" and not quiz_data:
-            raise serializers.ValidationError({"quiz_data": ["Quiz data is required."]})
+        if item_type == "quiz":
+            if not quiz_data:
+                raise serializers.ValidationError({"quiz_data": ["Quiz data is required."]})
+            questions = quiz_data.get("questions", [])
+            for q in questions:
+                q_type = q.get("question_type", "multiple_choice")
+                if q_type == "multiple_choice":
+                    if not q.get("options") or len(q["options"]) < 2:
+                        raise serializers.ValidationError(
+                            {"quiz_data": ["Multiple choice questions require at least 2 answer options."]}
+                        )
+                    if not q.get("correctOptionId"):
+                        raise serializers.ValidationError(
+                            {"quiz_data": ["Multiple choice questions require a correct answer to be selected."]}
+                        )
 
         return attrs
 

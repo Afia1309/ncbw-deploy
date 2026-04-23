@@ -21,6 +21,8 @@ urlpatterns = [
     path("courses/<int:course_id>/feedback/", views.submit_course_feedback, name="submit-course-feedback"),
     path("items/<int:item_id>/progress/", views.update_item_progress, name="item-progress-update"),
     path("items/<int:item_id>/submit-quiz/", views.submit_quiz, name="quiz-submit"),
+    path("instructor/items/<int:item_id>/quiz-submissions/", views.instructor_quiz_submissions, name="quiz-submissions"),
+    path("instructor/quiz-attempts/<int:attempt_id>/grade/", views.grade_quiz_attempt, name="quiz-grade"),
 
     path('certificate/', views.get_certificate, name='certificate'),
     path('certificate/pdf/', views.download_certificate_pdf, name='certificate_pdf'),

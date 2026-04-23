@@ -145,6 +145,11 @@ class ItemMemberAccess(models.Model):
 
 
 class QuizAttempt(models.Model):
+    SUBMISSION_STATUS_CHOICES = [
+        ("graded", "Graded"),
+        ("pending_review", "Pending Review"),
+    ]
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -157,6 +162,13 @@ class QuizAttempt(models.Model):
     )
     score_percent = models.FloatField(default=0)
     passed = models.BooleanField(default=False)
+    submission_status = models.CharField(
+        max_length=20,
+        choices=SUBMISSION_STATUS_CHOICES,
+        default="graded",
+    )
+    responses = models.JSONField(default=dict, blank=True)
+    short_answer_scores = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -171,6 +183,7 @@ class ItemProgress(models.Model):
         ("not_started", "Not Started"),
         ("in_progress", "In Progress"),
         ("completed", "Completed"),
+        ("pending_review", "Pending Review"),
     ]
 
     user = models.ForeignKey(

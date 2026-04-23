@@ -550,6 +550,19 @@ class TraineeCourseDetailView(APIView):
             ).values("item_id").annotate(count=Count("id"))
         }
 
+        # Most recent attempt per item — used by frontend to derive quiz display state
+        last_attempt_map = {}
+        for attempt in QuizAttempt.objects.filter(
+            user=request.user,
+            item_id__in=visible_item_ids,
+        ).order_by("item_id", "-created_at"):
+            if attempt.item_id not in last_attempt_map:
+                last_attempt_map[attempt.item_id] = {
+                    "score_percent": attempt.score_percent,
+                    "passed": attempt.passed,
+                    "submission_status": attempt.submission_status,
+                }
+
         modules = course.modules.filter(is_visible=True).order_by("order", "id")
         modules_data = TraineeModuleSerializer(
             modules,
@@ -559,6 +572,7 @@ class TraineeCourseDetailView(APIView):
                 "user": request.user,
                 "progress_map": progress_map,
                 "quiz_attempts_map": quiz_attempts_map,
+                "last_attempt_map": last_attempt_map,
                 "item_matcher": item_matches_user,
             },
         ).data
@@ -745,34 +759,213 @@ def submit_quiz(request, item_id):
     answers = request.data.get("answers", {})
     questions = quiz_data.get("questions", [])
     passing_grade = quiz_data.get("passingGrade", 70)
-
-    correct = 0
     total = len(questions)
+
+    mc_correct = 0
+    sa_question_ids = []
+    responses = {}
+
     for q in questions:
-        if str(answers.get(str(q["id"]))) == str(q.get("correctOptionId")):
-            correct += 1
+        q_id = str(q["id"])
+        q_type = q.get("question_type", "multiple_choice")
+        answer_val = answers.get(q_id)
+        responses[q_id] = str(answer_val) if answer_val is not None else ""
 
-    percent = round((correct / total) * 100) if total else 0
-    passed = percent >= passing_grade
+        if q_type == "multiple_choice":
+            if str(answer_val) == str(q.get("correctOptionId")):
+                mc_correct += 1
+        else:
+            sa_question_ids.append(q_id)
 
-    QuizAttempt.objects.create(user=request.user, item=item, score_percent=percent, passed=passed)
+    has_sa = len(sa_question_ids) > 0
+
+    if has_sa:
+        # Provisional score: MC-correct share of total questions; not final until graded
+        percent = round((mc_correct / total) * 100) if total else 0
+        passed = False
+        submission_status = "pending_review"
+    else:
+        # MC-only: keep existing count-based behaviour for backward compat
+        percent = round((mc_correct / total) * 100) if total else 0
+        passed = percent >= passing_grade
+        submission_status = "graded"
+
+    QuizAttempt.objects.create(
+        user=request.user,
+        item=item,
+        score_percent=percent,
+        passed=passed,
+        submission_status=submission_status,
+        responses=responses,
+    )
     attempts_used += 1
 
     progress, _ = ItemProgress.objects.get_or_create(user=request.user, item=item)
-    if passed or progress.status != "completed":
-        progress.status = "completed" if passed else "in_progress"
-        progress.last_activity = timezone.now()
-        if passed:
-            progress.completed_at = timezone.now()
-        progress.save()
+    if has_sa:
+        # Mark as pending_review until instructor grades
+        if progress.status != "completed":
+            progress.status = "pending_review"
+            progress.last_activity = timezone.now()
+            progress.save()
+    else:
+        if passed or progress.status != "completed":
+            progress.status = "completed" if passed else "in_progress"
+            progress.last_activity = timezone.now()
+            if passed:
+                progress.completed_at = timezone.now()
+            progress.save()
 
     return Response({
-        "correct": correct,
+        "correct": mc_correct,
         "total": total,
-        "percent": percent,
+        "percent": percent if not has_sa else None,
         "passed": passed,
         "attempts_used": attempts_used,
         "max_attempts": max_attempts,
+        "submission_status": submission_status,
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def instructor_quiz_submissions(request, item_id):
+    """
+    GET /api/training/instructor/items/<item_id>/quiz-submissions/
+    Returns all quiz attempts for a quiz item (instructor/admin only).
+    """
+    try:
+        item = Item.objects.select_related("module__course").get(id=item_id)
+    except Item.DoesNotExist:
+        return Response({"detail": "Item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_manage_course(request.user, item.module.course):
+        return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+    if item.item_type != "quiz":
+        return Response({"detail": "This item is not a quiz."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # One latest attempt per user
+    attempts = (
+        QuizAttempt.objects.filter(item=item)
+        .select_related("user__profile")
+        .order_by("user_id", "-created_at")
+    )
+    seen = set()
+    latest_attempts = []
+    for attempt in attempts:
+        if attempt.user_id not in seen:
+            seen.add(attempt.user_id)
+            latest_attempts.append(attempt)
+
+    quiz_data = item.quiz_data or {}
+    questions = quiz_data.get("questions", [])
+
+    submissions = []
+    for attempt in latest_attempts:
+        profile = getattr(attempt.user, "profile", None)
+        submissions.append({
+            "id": attempt.id,
+            "trainee_name": attempt.user.get_full_name() or attempt.user.username,
+            "trainee_member_id": profile.member_id if profile else attempt.user.username,
+            "submitted_at": attempt.created_at,
+            "submission_status": attempt.submission_status,
+            "score_percent": attempt.score_percent,
+            "passed": attempt.passed,
+            "responses": attempt.responses,
+            "short_answer_scores": attempt.short_answer_scores,
+        })
+
+    return Response({
+        "questions": questions,
+        "submissions": submissions,
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def grade_quiz_attempt(request, attempt_id):
+    """
+    POST /api/training/instructor/quiz-attempts/<attempt_id>/grade/
+    Body: { short_answer_scores: { <questionId>: <points_awarded> } }
+    """
+    try:
+        attempt = QuizAttempt.objects.select_related(
+            "item__module__course", "user"
+        ).get(id=attempt_id)
+    except QuizAttempt.DoesNotExist:
+        return Response({"detail": "Attempt not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_manage_course(request.user, attempt.item.module.course):
+        return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+    if attempt.submission_status != "pending_review":
+        return Response(
+            {"detail": "This attempt has already been graded."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    sa_scores_input = request.data.get("short_answer_scores", {})
+    quiz_data = attempt.item.quiz_data or {}
+    questions = quiz_data.get("questions", [])
+    passing_grade = quiz_data.get("passingGrade", 70)
+
+    # Build per-question maps from stored quiz_data
+    total_possible_points = 0.0
+    mc_points_earned = 0.0
+    sa_max_points = {}
+
+    for q in questions:
+        q_id = str(q["id"])
+        q_type = q.get("question_type", "multiple_choice")
+        q_points = float(q.get("points", 1))
+        total_possible_points += q_points
+
+        if q_type == "multiple_choice":
+            stored_answer = attempt.responses.get(q_id, "")
+            if str(stored_answer) == str(q.get("correctOptionId")):
+                mc_points_earned += q_points
+        else:
+            sa_max_points[q_id] = q_points
+
+    # Validate and clamp SA scores
+    validated_scores = {}
+    for q_id, awarded in sa_scores_input.items():
+        max_pts = sa_max_points.get(str(q_id), 0)
+        try:
+            awarded = float(awarded)
+        except (TypeError, ValueError):
+            awarded = 0.0
+        validated_scores[str(q_id)] = min(max(awarded, 0.0), max_pts)
+
+    sa_points_earned = sum(validated_scores.values())
+    total_earned = mc_points_earned + sa_points_earned
+
+    if total_possible_points > 0:
+        percent = round((total_earned / total_possible_points) * 100)
+    else:
+        percent = 0
+
+    passed = percent >= passing_grade
+
+    attempt.score_percent = percent
+    attempt.passed = passed
+    attempt.submission_status = "graded"
+    attempt.short_answer_scores = validated_scores
+    attempt.save()
+
+    # Update ItemProgress
+    progress, _ = ItemProgress.objects.get_or_create(user=attempt.user, item=attempt.item)
+    progress.status = "completed" if passed else "in_progress"
+    progress.last_activity = timezone.now()
+    if passed:
+        progress.completed_at = timezone.now()
+    progress.save()
+
+    return Response({
+        "ok": True,
+        "score_percent": percent,
+        "passed": passed,
+        "submission_status": "graded",
     })
 
 
