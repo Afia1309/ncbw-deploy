@@ -864,7 +864,7 @@ def instructor_quiz_submissions(request, item_id):
     for attempt in latest_attempts:
         profile = getattr(attempt.user, "profile", None)
         submissions.append({
-            "id": attempt.id,
+            "attempt_id": attempt.id,
             "trainee_name": attempt.user.get_full_name() or attempt.user.username,
             "trainee_member_id": profile.member_id if profile else attempt.user.username,
             "submitted_at": attempt.created_at,

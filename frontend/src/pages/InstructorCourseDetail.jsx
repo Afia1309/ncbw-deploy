@@ -1795,7 +1795,7 @@ export default function InstructorCourseDetail() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                       <div>
                         <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{sub.trainee_name || sub.trainee_username}</span>
-                        {sub.member_id && <span style={{ color: "#667085", fontSize: "0.82rem", marginLeft: "8px" }}>({sub.member_id})</span>}
+                        {sub.trainee_member_id && <span style={{ color: "#667085", fontSize: "0.82rem", marginLeft: "8px" }}>({sub.trainee_member_id})</span>}
                       </div>
                       <span style={{ fontSize: "0.8rem", color: sub.submission_status === "graded" ? "#16a34a" : "#0369a1", background: sub.submission_status === "graded" ? "#f0fdf4" : "#e0f2fe", padding: "2px 8px", borderRadius: "12px" }}>
                         {sub.submission_status === "graded" ? `Graded · ${sub.score_percent}%` : "Pending Review"}
