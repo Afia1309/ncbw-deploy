@@ -36,6 +36,7 @@ const nowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const createBlankQuestion = () => ({
   id: nowId(),
+  question_type: "multiple_choice",
   prompt: "",
   points: 1,
   options: [
@@ -45,6 +46,7 @@ const createBlankQuestion = () => ({
     { id: nowId(), text: "" },
   ],
   correctOptionId: null,
+  sample_answer: "",
 });
 
 const normalizeQuizQuestions = (quiz) => {
@@ -54,6 +56,7 @@ const normalizeQuizQuestions = (quiz) => {
 
   return quiz.questions.map((question) => ({
     id: question.id || nowId(),
+    question_type: question.question_type || "multiple_choice",
     prompt: question.prompt || "",
     points: question.points ?? 1,
     options:
@@ -69,6 +72,7 @@ const normalizeQuizQuestions = (quiz) => {
             { id: nowId(), text: "" },
           ],
     correctOptionId: question.correctOptionId ?? null,
+    sample_answer: question.sample_answer || "",
   }));
 };
 
@@ -169,6 +173,10 @@ export default function InstructorCourseDetail() {
   const [quizQuestions, setQuizQuestions] = useState([createBlankQuestion()]);
   const [quizPassingGrade, setQuizPassingGrade] = useState(70);
   const [quizMaxAttempts, setQuizMaxAttempts] = useState(0);
+
+  const [gradingModal, setGradingModal] = useState(null);
+  const [gradingScores, setGradingScores] = useState({});
+  const [gradingLoading, setGradingLoading] = useState(false);
 
   const [enrollmentSearch, setEnrollmentSearch] = useState("");
   const [enrollmentSort, setEnrollmentSort] = useState("default");
@@ -623,6 +631,18 @@ export default function InstructorCourseDetail() {
     );
   };
 
+  const updateQuizQuestionType = (questionId, value) => {
+    setQuizQuestions((prev) =>
+      prev.map((q) => q.id === questionId ? { ...q, question_type: value } : q)
+    );
+  };
+
+  const updateQuizSampleAnswer = (questionId, value) => {
+    setQuizQuestions((prev) =>
+      prev.map((q) => q.id === questionId ? { ...q, sample_answer: value } : q)
+    );
+  };
+
   const buildItemJsonPayload = () => {
     const backendType = labelToBackendType[newItemType];
 
@@ -647,25 +667,30 @@ export default function InstructorCourseDetail() {
 
     if (backendType === "quiz") {
       const cleanedQuestions = quizQuestions
-        .map((question) => ({
-          id: question.id,
-          prompt: question.prompt.trim(),
-          points: Number(question.points || 0),
-          options: question.options
-            .map((option) => ({
-              id: option.id,
-              text: option.text.trim(),
-            }))
-            .filter((option) => option.text),
-          correctOptionId: question.correctOptionId,
-        }))
-        .filter(
-          (question) =>
-            question.prompt &&
-            question.options.length >= 2 &&
-            question.correctOptionId &&
-            question.points > 0
-        );
+        .map((question) => {
+          const q = {
+            id: question.id,
+            question_type: question.question_type || "multiple_choice",
+            prompt: question.prompt.trim(),
+            points: Number(question.points || 0),
+          };
+          if (q.question_type === "multiple_choice") {
+            q.options = question.options
+              .map((option) => ({ id: option.id, text: option.text.trim() }))
+              .filter((option) => option.text);
+            q.correctOptionId = question.correctOptionId;
+          } else {
+            q.sample_answer = (question.sample_answer || "").trim();
+          }
+          return q;
+        })
+        .filter((question) => {
+          if (!question.prompt || question.points <= 0) return false;
+          if (question.question_type === "multiple_choice") {
+            return question.options.length >= 2 && question.correctOptionId;
+          }
+          return true;
+        });
 
       if (!cleanedQuestions.length) {
         throw new Error("Quiz must include at least one valid question.");
@@ -775,15 +800,15 @@ export default function InstructorCourseDetail() {
       errors.content = "Text content is required.";
     }
     if (backendType === "quiz") {
-      const hasValidQuestion = quizQuestions.some(
-        (q) =>
-          q.prompt.trim() &&
-          q.options.filter((o) => o.text.trim()).length >= 2 &&
-          q.correctOptionId &&
-          Number(q.points) > 0
-      );
+      const hasValidQuestion = quizQuestions.some((q) => {
+        if (!q.prompt.trim() || Number(q.points) <= 0) return false;
+        if ((q.question_type || "multiple_choice") === "multiple_choice") {
+          return q.options.filter((o) => o.text.trim()).length >= 2 && q.correctOptionId;
+        }
+        return true;
+      });
       if (!hasValidQuestion) {
-        errors.quiz = "Add at least one question with a prompt, 2+ options, a correct answer, and a point value.";
+        errors.quiz = "Add at least one valid question (multiple choice needs 2+ options and a correct answer; short answer needs a prompt and point value).";
       }
     }
     if (newItemAudienceType === "role" && !newItemAudienceRoles.length) {
@@ -886,6 +911,55 @@ export default function InstructorCourseDetail() {
       alert("Failed to update item visibility.");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const openGradingModal = async (item) => {
+    try {
+      const data = await fetchWithAuth(`${API_BASE}/instructor/items/${item.id}/quiz-submissions/`);
+      const initScores = {};
+      (data.submissions || []).forEach((sub) => {
+        initScores[sub.attempt_id] = {};
+        Object.entries(sub.short_answer_scores || {}).forEach(([qId, val]) => {
+          initScores[sub.attempt_id][qId] = String(val);
+        });
+      });
+      setGradingScores(initScores);
+      setGradingModal({ item, submissions: data.submissions || [], questions: data.questions || [] });
+    } catch (err) {
+      alert(`Failed to load submissions: ${err.message}`);
+    }
+  };
+
+  const handleGradeSubmit = async (attemptId) => {
+    setGradingLoading(true);
+    try {
+      const scores = gradingScores[attemptId] || {};
+      const payload = {};
+      for (const [qId, val] of Object.entries(scores)) {
+        payload[qId] = Number(val) || 0;
+      }
+      const updated = await fetchWithAuth(`${API_BASE}/instructor/quiz-attempts/${attemptId}/grade/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ short_answer_scores: payload }),
+      });
+      // Refresh the modal submissions list
+      setGradingModal((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          submissions: prev.submissions.map((sub) =>
+            sub.attempt_id === attemptId
+              ? { ...sub, score_percent: updated.score_percent, passed: updated.passed, submission_status: updated.submission_status, short_answer_scores: payload }
+              : sub
+          ),
+        };
+      });
+    } catch (err) {
+      alert(`Failed to save grade: ${err.message}`);
+    } finally {
+      setGradingLoading(false);
     }
   };
 
@@ -1080,6 +1154,17 @@ export default function InstructorCourseDetail() {
               </div>
 
               <div className="modal-field">
+                <label>Question Type</label>
+                <select
+                  value={question.question_type || "multiple_choice"}
+                  onChange={(e) => updateQuizQuestionType(question.id, e.target.value)}
+                >
+                  <option value="multiple_choice">Multiple Choice</option>
+                  <option value="short_answer">Short Answer</option>
+                </select>
+              </div>
+
+              <div className="modal-field">
                 <label>Question Prompt</label>
                 <textarea
                   value={question.prompt}
@@ -1102,41 +1187,49 @@ export default function InstructorCourseDetail() {
                 </div>
               </div>
 
-              <div className="quiz-options-grid">
-                {question.options.map((option, optionIndex) => (
-                  <div key={option.id} className="quiz-option-row">
-                    <div className="quiz-option-input-wrap">
-                      <span className="quiz-option-letter">
-                        {String.fromCharCode(65 + optionIndex)}
-                      </span>
-
-                      <input
-                        type="text"
-                        value={option.text}
-                        onChange={(e) =>
-                          updateQuizOptionText(question.id, option.id, e.target.value)
-                        }
-                        placeholder={`Answer option ${optionIndex + 1}`}
-                      />
+              {(question.question_type || "multiple_choice") === "multiple_choice" ? (
+                <div className="quiz-options-grid">
+                  {question.options.map((option, optionIndex) => (
+                    <div key={option.id} className="quiz-option-row">
+                      <div className="quiz-option-input-wrap">
+                        <span className="quiz-option-letter">
+                          {String.fromCharCode(65 + optionIndex)}
+                        </span>
+                        <input
+                          type="text"
+                          value={option.text}
+                          onChange={(e) => updateQuizOptionText(question.id, option.id, e.target.value)}
+                          placeholder={`Answer option ${optionIndex + 1}`}
+                        />
+                      </div>
+                      <label className="correct-answer-select">
+                        <input
+                          type="radio"
+                          name={`correct-answer-${question.id}`}
+                          checked={question.correctOptionId === option.id}
+                          onChange={() => setQuizCorrectAnswer(question.id, option.id)}
+                        />
+                        <span>Correct answer</span>
+                      </label>
                     </div>
-
-                    <label className="correct-answer-select">
-                      <input
-                        type="radio"
-                        name={`correct-answer-${question.id}`}
-                        checked={question.correctOptionId === option.id}
-                        onChange={() => setQuizCorrectAnswer(question.id, option.id)}
-                      />
-                      <span>Correct answer</span>
-                    </label>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="modal-field">
+                  <label>Sample Answer (optional, instructor reference only)</label>
+                  <textarea
+                    value={question.sample_answer || ""}
+                    onChange={(e) => updateQuizSampleAnswer(question.id, e.target.value)}
+                    placeholder="Enter a sample answer for your reference..."
+                    rows={3}
+                  />
+                </div>
+              )}
             </div>
           ))}
 
           <div className="quiz-autograde-note">
-            Auto-grading enabled. Correct answers remain instructor-only.
+            Multiple choice questions are auto-graded. Short answer responses require manual review.
           </div>
 
           {itemErrors.quiz && (
@@ -1501,7 +1594,13 @@ export default function InstructorCourseDetail() {
                                   {item.quiz.questions?.length || 0} question
                                   {(item.quiz.questions?.length || 0) !== 1 ? "s" : ""} ·{" "}
                                   {item.quiz.totalPoints || 0} points · Pass{" "}
-                                  {item.quiz.passingGrade ?? 70}% · Auto-graded
+                                  {item.quiz.passingGrade ?? 70}% ·{" "}
+                                  {(() => {
+                                    const hasSA = (item.quiz.questions || []).some(
+                                      (q) => (q.question_type || "multiple_choice") === "short_answer"
+                                    );
+                                    return hasSA ? "Requires review" : "Auto-graded";
+                                  })()}
                                 </span>
                               )}
 
@@ -1534,6 +1633,17 @@ export default function InstructorCourseDetail() {
                               >
                                 {item.visible ? "Hide Item" : "Show Item"}
                               </button>
+
+                              {item.type === "Quiz" && (item.quiz?.questions || []).some(
+                                (q) => (q.question_type || "multiple_choice") === "short_answer"
+                              ) && (
+                                <button
+                                  className="outline-btn small-outline-btn"
+                                  onClick={() => openGradingModal(item)}
+                                >
+                                  Grade Responses
+                                </button>
+                              )}
 
                               <button
                                 className="outline-btn small-outline-btn"
@@ -1661,6 +1771,77 @@ export default function InstructorCourseDetail() {
                 <button className="gold-action-btn" onClick={handleCreateModule} disabled={actionLoading}>
                   Create Module
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {gradingModal && (
+          <div className="modal-overlay" onClick={() => setGradingModal(null)}>
+            <div className="modal-card large-modal-card" style={{ display: "flex", flexDirection: "column", maxHeight: "85vh" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e4e7ec", flexShrink: 0 }}>
+                <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Grade Responses — {gradingModal.item.title}</h2>
+                <p style={{ margin: "4px 0 0", fontSize: "0.83rem", color: "#667085" }}>
+                  {gradingModal.submissions.length} submission{gradingModal.submissions.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+
+              <div style={{ overflowY: "auto", flex: 1, padding: "16px 24px" }}>
+                {gradingModal.submissions.length === 0 && (
+                  <p style={{ color: "#667085", fontSize: "0.9rem" }}>No submissions yet.</p>
+                )}
+                {gradingModal.submissions.map((sub) => (
+                  <div key={sub.attempt_id} style={{ border: "1px solid #e4e7ec", borderRadius: "10px", padding: "16px", marginBottom: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{sub.trainee_name || sub.trainee_username}</span>
+                        {sub.member_id && <span style={{ color: "#667085", fontSize: "0.82rem", marginLeft: "8px" }}>({sub.member_id})</span>}
+                      </div>
+                      <span style={{ fontSize: "0.8rem", color: sub.submission_status === "graded" ? "#16a34a" : "#0369a1", background: sub.submission_status === "graded" ? "#f0fdf4" : "#e0f2fe", padding: "2px 8px", borderRadius: "12px" }}>
+                        {sub.submission_status === "graded" ? `Graded · ${sub.score_percent}%` : "Pending Review"}
+                      </span>
+                    </div>
+
+                    {gradingModal.questions.filter((q) => (q.question_type || "multiple_choice") === "short_answer").map((q) => (
+                      <div key={q.id} style={{ marginBottom: "14px" }}>
+                        <div style={{ fontWeight: 500, fontSize: "0.88rem", marginBottom: "4px", color: "#374151" }}>{q.prompt}</div>
+                        <div style={{ background: "#f9fafb", border: "1px solid #e4e7ec", borderRadius: "6px", padding: "8px 10px", fontSize: "0.88rem", color: "#344054", marginBottom: "8px", whiteSpace: "pre-wrap" }}>
+                          {(sub.responses || {})[q.id] || <em style={{ color: "#98a2b3" }}>No response</em>}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <label style={{ fontSize: "0.82rem", color: "#667085", whiteSpace: "nowrap" }}>
+                            Score (max {q.points}):
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={q.points}
+                            value={(gradingScores[sub.attempt_id] || {})[q.id] ?? ""}
+                            onChange={(e) => setGradingScores((prev) => ({
+                              ...prev,
+                              [sub.attempt_id]: { ...(prev[sub.attempt_id] || {}), [q.id]: e.target.value },
+                            }))}
+                            style={{ width: "70px", padding: "4px 8px", borderRadius: "6px", border: "1px solid #e4e7ec", fontSize: "0.88rem" }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    <div style={{ borderTop: "1px solid #e4e7ec", paddingTop: "12px", display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        className="gold-action-btn small"
+                        onClick={() => handleGradeSubmit(sub.attempt_id)}
+                        disabled={gradingLoading}
+                      >
+                        {gradingLoading ? "Saving..." : "Save Grade"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ padding: "14px 24px", borderTop: "1px solid #e4e7ec", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+                <button className="outline-btn" onClick={() => setGradingModal(null)}>Close</button>
               </div>
             </div>
           </div>

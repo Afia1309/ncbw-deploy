@@ -187,6 +187,21 @@ function ProgressCircle({ status, onClick, clickable = false }) {
         <path d="M 10 2 A 8 8 0 0 1 10 18" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
       </svg>
     );
+  } else if (status === "submitted_failed") {
+    inner = (
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="white" stroke="#c5ccd8" strokeWidth="2" />
+        <polyline points="6 10 9 13 14 7" fill="none" stroke="#c5ccd8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  } else if (status === "pending_review") {
+    inner = (
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="white" stroke="#0369a1" strokeWidth="2" />
+        <line x1="10" y1="10" x2="10" y2="6" stroke="#0369a1" strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="10" y1="10" x2="13" y2="12" stroke="#0369a1" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
   } else {
     inner = (
       <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
@@ -285,6 +300,14 @@ function renderTextWithBreaks(text) {
   ));
 }
 
+function getItemDisplayStatus(entry) {
+  if (entry.item_type !== "quiz") return entry.status;
+  if (entry.status === "completed") return "completed";
+  if (entry.status === "pending_review") return "pending_review";
+  if (entry.last_attempt && !entry.last_attempt.passed) return "submitted_failed";
+  return entry.status;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CourseMaterial() {
@@ -294,8 +317,7 @@ export default function CourseMaterial() {
 
   const [item, setItem] = useState(location.state?.item || null);
   const [answers, setAnswers] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(null);
+  const [retaking, setRetaking] = useState(false);
   const [confirmUnanswered, setConfirmUnanswered] = useState(false);
   const [attemptsUsed, setAttemptsUsed] = useState(0);
   const [maxAttempts, setMaxAttempts] = useState(0);
@@ -431,9 +453,8 @@ export default function CourseMaterial() {
     if (item) {
       setAttemptsUsed(item.attempts_used ?? 0);
       setMaxAttempts(item.quiz_data?.maxAttempts ?? 0);
-      setSubmitted(false);
-      setScore(null);
       setAnswers({});
+      setRetaking(false);
       setConfirmUnanswered(false);
     }
   }, [item?.id]);
@@ -462,15 +483,27 @@ export default function CourseMaterial() {
         }
         return;
       }
-      setScore({ correct: data.correct, total: data.total, percent: data.percent, passed: data.passed });
-      setSubmitted(true);
       setAttemptsUsed(data.attempts_used);
       setMaxAttempts(data.max_attempts);
-      // Sync item status in sidebar
-      const newStatus = data.passed ? "completed" : "in_progress";
-      setItem((prev) => ({ ...prev, status: newStatus }));
+      setRetaking(false);
+      const newLastAttempt = {
+        score_percent: data.percent,
+        passed: data.passed,
+        submission_status: data.submission_status,
+      };
+      let newItemStatus;
+      if (data.submission_status === "pending_review") {
+        newItemStatus = "pending_review";
+      } else {
+        newItemStatus = data.passed ? "completed" : "in_progress";
+      }
+      setItem((prev) => ({ ...prev, status: newItemStatus, last_attempt: newLastAttempt }));
       setModuleItems((prev) =>
-        prev.map((e) => String(e.id) === String(item.id) ? { ...e, status: newStatus } : e)
+        prev.map((e) =>
+          String(e.id) === String(item.id)
+            ? { ...e, status: newItemStatus, last_attempt: newLastAttempt }
+            : e
+        )
       );
     } catch {
       setError("Could not submit quiz. Please try again.");
@@ -479,7 +512,9 @@ export default function CourseMaterial() {
 
   const handleSubmitQuiz = () => {
     if (!item?.quiz_data?.questions) return;
-    const unanswered = item.quiz_data.questions.filter((q) => answers[q.id] === undefined).length;
+    const unanswered = item.quiz_data.questions.filter(
+      (q) => (q.question_type || "multiple_choice") === "multiple_choice" && answers[q.id] === undefined
+    ).length;
     if (unanswered > 0) {
       setConfirmUnanswered(unanswered);
       return;
@@ -490,8 +525,7 @@ export default function CourseMaterial() {
   const handleRetakeQuiz = () => {
     if (maxAttempts > 0 && attemptsUsed >= maxAttempts) return;
     setAnswers({});
-    setSubmitted(false);
-    setScore(null);
+    setRetaking(true);
     setConfirmUnanswered(false);
   };
 
@@ -501,6 +535,22 @@ export default function CourseMaterial() {
 
   const itemTitle = item?.title || "Course Material";
   const itemType = getItemType(item);
+
+  const deriveQuizPhase = () => {
+    if (!item) return "form";
+    const lastAttempt = item.last_attempt;
+    const status = item.status;
+    if (status === "pending_review") return "pending_review";
+    if (lastAttempt?.submission_status === "pending_review") return "pending_review";
+    if (lastAttempt) {
+      if (lastAttempt.passed) return "graded_passed";
+      const exhausted = maxAttempts > 0 && attemptsUsed >= maxAttempts;
+      if (retaking && !exhausted) return "form";
+      return exhausted ? "graded_failed_locked" : "graded_failed_retake";
+    }
+    return "form";
+  };
+  const quizPhase = deriveQuizPhase();
 
   return (
     <MemberLayout title={courseTitle || itemTitle}>
@@ -560,7 +610,7 @@ export default function CourseMaterial() {
                   }}
                 >
                   <ProgressCircle
-                    status={entry.status}
+                    status={getItemDisplayStatus(entry)}
                     clickable
                     onClick={() => toggleItemStatus(entry.id)}
                   />
@@ -672,7 +722,7 @@ export default function CourseMaterial() {
             <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "16px" }}>
               <div style={{ paddingTop: "3px" }}>
                 <ProgressCircle
-                  status={item.status}
+                  status={getItemDisplayStatus(item)}
                   clickable
                   onClick={() => toggleItemStatus(item.id)}
                 />
@@ -687,7 +737,12 @@ export default function CourseMaterial() {
                   </div>
                 )}
                 <div style={{ fontSize: "0.78rem", color: "#98a2b3", marginTop: "2px" }}>
-                  {item.status === "completed" ? "✓ Completed" : item.status === "in_progress" ? "In progress" : "Not started"}
+                  {itemType === "quiz"
+                    ? (quizPhase === "graded_passed" ? "✓ Completed · Passed"
+                      : quizPhase === "graded_failed_locked" || quizPhase === "graded_failed_retake" ? "Completed · Did not pass"
+                      : quizPhase === "pending_review" ? "⏳ Submitted · Awaiting review"
+                      : item.status === "in_progress" ? "In progress" : "Not started")
+                    : (item.status === "completed" ? "✓ Completed" : item.status === "in_progress" ? "In progress" : "Not started")}
                   {itemType !== "quiz" && (
                     <>
                       {" · "}
@@ -738,127 +793,136 @@ export default function CourseMaterial() {
             ) : itemType === "quiz" ? (
               <div style={{ border: "1px solid #e4e7ec", borderRadius: "12px", padding: "18px 20px" }}>
 
-                {/* Attempts info */}
-                {maxAttempts > 0 && (
-                  <div style={{ marginBottom: "14px", fontSize: "0.82rem", color: attemptsUsed >= maxAttempts ? "#dc2626" : "#667085" }}>
-                    {attemptsUsed >= maxAttempts
-                      ? "No attempts remaining."
-                      : `Attempt ${attemptsUsed + 1} of ${maxAttempts}`}
+                {/* Pending review state */}
+                {quizPhase === "pending_review" && (
+                  <div style={{ textAlign: "center", padding: "24px 16px" }}>
+                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>⏳</div>
+                    <h3 style={{ margin: "0 0 8px", color: "#0369a1" }}>Submitted — Awaiting Review</h3>
+                    <p style={{ margin: 0, fontSize: "0.9rem", color: "#667085" }}>
+                      Your short answer responses have been submitted and are pending instructor review. You'll see your score once graded.
+                    </p>
                   </div>
                 )}
 
-                {item?.quiz_data?.questions?.length ? (
+                {/* Passed state */}
+                {quizPhase === "graded_passed" && (
+                  <div style={{ textAlign: "center", padding: "24px 16px" }}>
+                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>✅</div>
+                    <h3 style={{ margin: "0 0 8px", color: "#16a34a" }}>Passed!</h3>
+                    <p style={{ margin: 0, fontSize: "0.9rem", color: "#667085" }}>
+                      Score: {item.last_attempt?.score_percent ?? 0}%
+                    </p>
+                  </div>
+                )}
+
+                {/* Failed — no retakes left */}
+                {quizPhase === "graded_failed_locked" && (
+                  <div style={{ textAlign: "center", padding: "24px 16px" }}>
+                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>📋</div>
+                    <h3 style={{ margin: "0 0 8px", color: "#374151" }}>Did not pass</h3>
+                    <p style={{ margin: "0 0 4px", fontSize: "0.9rem", color: "#667085" }}>
+                      Score: {item.last_attempt?.score_percent ?? 0}%
+                    </p>
+                    <p style={{ margin: 0, fontSize: "0.85rem", color: "#98a2b3" }}>
+                      No attempts remaining.
+                    </p>
+                  </div>
+                )}
+
+                {/* Failed — retake available */}
+                {quizPhase === "graded_failed_retake" && (
+                  <div style={{ textAlign: "center", padding: "24px 16px" }}>
+                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>📋</div>
+                    <h3 style={{ margin: "0 0 8px", color: "#374151" }}>Did not pass</h3>
+                    <p style={{ margin: "0 0 16px", fontSize: "0.9rem", color: "#667085" }}>
+                      Score: {item.last_attempt?.score_percent ?? 0}%
+                      {maxAttempts > 0 && ` · ${maxAttempts - attemptsUsed} attempt${maxAttempts - attemptsUsed !== 1 ? "s" : ""} remaining`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetakeQuiz}
+                      style={{ padding: "8px 18px", borderRadius: "8px", border: "1px solid #e4e7ec", background: "#f3f4f6", color: "#111", cursor: "pointer", fontWeight: 500 }}
+                    >
+                      Start new attempt
+                    </button>
+                  </div>
+                )}
+
+                {/* Active form */}
+                {quizPhase === "form" && (
                   <>
-                    {item.quiz_data.questions.map((q, qIndex) => (
-                      <div key={q.id || qIndex} style={{ marginBottom: "20px" }}>
-
-                        <div style={{ fontWeight: "600", marginBottom: "10px" }}>
-                          {qIndex + 1}. {q.prompt}
-                        </div>
-
-                        {q.options.map((opt) => (
-                          <label
-                            key={opt.id}
-                            style={{ display: "block", marginBottom: "6px", cursor: submitted ? "default" : "pointer" }}
-                          >
-                            <input
-                              type="radio"
-                              name={`question-${q.id}`}
-                              value={opt.id}
-                              checked={answers[q.id] === opt.id}
-                              onChange={() => { if (!submitted) handleSelect(q.id, opt.id); }}
-                              disabled={submitted}
-                              style={{ marginRight: "8px" }}
-                            />
-                            {opt.text}
-                          </label>
-                        ))}
-                      </div>
-                    ))}
-
-                    {/* Unanswered confirmation warning */}
-                    {confirmUnanswered > 0 && !submitted && (
-                      <div style={{ background: "#f9fafb", border: "1px solid #e4e7ec", borderRadius: "8px", padding: "12px 14px", marginBottom: "12px" }}>
-                        <p style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#374151" }}>
-                          {confirmUnanswered} question{confirmUnanswered !== 1 ? "s" : ""} left unanswered — {confirmUnanswered !== 1 ? "they" : "it"} will be marked incorrect.
-                        </p>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmUnanswered(false)}
-                            style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #e4e7ec", background: "#fff", color: "#374151", cursor: "pointer", fontSize: "0.84rem" }}
-                          >
-                            Go back
-                          </button>
-                          <button
-                            type="button"
-                            onClick={actuallySubmitQuiz}
-                            style={{ padding: "6px 12px", borderRadius: "6px", border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontSize: "0.84rem" }}
-                          >
-                            Submit anyway
-                          </button>
-                        </div>
+                    {maxAttempts > 0 && (
+                      <div style={{ marginBottom: "14px", fontSize: "0.82rem", color: "#667085" }}>
+                        Attempt {attemptsUsed + 1} of {maxAttempts}
                       </div>
                     )}
 
-                    {!submitted && confirmUnanswered === false && !(maxAttempts > 0 && attemptsUsed >= maxAttempts) && (
-                      <button
-                        type="button"
-                        onClick={handleSubmitQuiz}
-                        style={{
-                          marginTop: "10px",
-                          padding: "8px 14px",
-                          borderRadius: "8px",
-                          border: "1px solid #e4e7ec",
-                          background: "#2563eb",
-                          color: "white",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Submit Quiz
-                      </button>
-                    )}
+                    {item?.quiz_data?.questions?.length ? (
+                      <>
+                        {item.quiz_data.questions.map((q, qIndex) => (
+                          <div key={q.id || qIndex} style={{ marginBottom: "20px" }}>
+                            <div style={{ fontWeight: "600", marginBottom: "10px" }}>
+                              {qIndex + 1}. {q.prompt}
+                              {q.points && <span style={{ fontWeight: 400, color: "#98a2b3", fontSize: "0.82rem", marginLeft: "8px" }}>({q.points} pt{q.points !== 1 ? "s" : ""})</span>}
+                            </div>
 
-                    {submitted && score && (
-                      <div style={{ marginTop: "15px" }}>
-                        <h3 style={{ marginBottom: "8px" }}>Results</h3>
-
-                        <p style={{ margin: "0 0 6px" }}>
-                          Score: {score.correct} / {score.total} ({score.percent}%)
-                        </p>
-
-                        <p style={{ margin: "0 0 12px", color: score.passed ? "#16a34a" : "#dc2626" }}>
-                          {score.passed ? "Passed!" : "Did not pass."}
-                        </p>
-
-                        {maxAttempts === 0 || attemptsUsed < maxAttempts ? (
-                          <button
-                            type="button"
-                            onClick={handleRetakeQuiz}
-                            style={{
-                              padding: "8px 14px",
-                              borderRadius: "8px",
-                              border: "1px solid #e4e7ec",
-                              background: "#f3f4f6",
-                              color: "#111",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Retake Quiz
-                            {maxAttempts > 0 && (
-                              <span style={{ fontSize: "0.78rem", color: "#667085", marginLeft: "6px" }}>
-                                ({maxAttempts - attemptsUsed} left)
-                              </span>
+                            {(q.question_type || "multiple_choice") === "multiple_choice" ? (
+                              q.options.map((opt) => (
+                                <label key={opt.id} style={{ display: "block", marginBottom: "6px", cursor: "pointer" }}>
+                                  <input
+                                    type="radio"
+                                    name={`question-${q.id}`}
+                                    value={opt.id}
+                                    checked={answers[q.id] === opt.id}
+                                    onChange={() => handleSelect(q.id, opt.id)}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  {opt.text}
+                                </label>
+                              ))
+                            ) : (
+                              <textarea
+                                value={answers[q.id] || ""}
+                                onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                                placeholder="Write your answer here..."
+                                rows={4}
+                                style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e4e7ec", fontSize: "0.9rem", resize: "vertical", boxSizing: "border-box" }}
+                              />
                             )}
+                          </div>
+                        ))}
+
+                        {confirmUnanswered > 0 && (
+                          <div style={{ background: "#f9fafb", border: "1px solid #e4e7ec", borderRadius: "8px", padding: "12px 14px", marginBottom: "12px" }}>
+                            <p style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#374151" }}>
+                              {confirmUnanswered} question{confirmUnanswered !== 1 ? "s" : ""} left unanswered — {confirmUnanswered !== 1 ? "they" : "it"} will be marked incorrect.
+                            </p>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={() => setConfirmUnanswered(false)}
+                                style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #e4e7ec", background: "#fff", color: "#374151", cursor: "pointer", fontSize: "0.84rem" }}>
+                                Go back
+                              </button>
+                              <button type="button" onClick={actuallySubmitQuiz}
+                                style={{ padding: "6px 12px", borderRadius: "6px", border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontSize: "0.84rem" }}>
+                                Submit anyway
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {confirmUnanswered === false && (
+                          <button type="button" onClick={handleSubmitQuiz}
+                            style={{ marginTop: "10px", padding: "8px 14px", borderRadius: "8px", border: "1px solid #e4e7ec", background: "#2563eb", color: "white", cursor: "pointer" }}>
+                            Submit Quiz
                           </button>
-                        ) : null}
-                      </div>
+                        )}
+                      </>
+                    ) : (
+                      <div>No quiz questions available.</div>
                     )}
                   </>
-                ) : (
-                  <div>No quiz questions available.</div>
                 )}
-            </div>
+              </div>
           ) : (
             <div className="dash-empty-panel">No content available for this item yet.</div>
           )}
